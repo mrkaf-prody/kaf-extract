@@ -4,20 +4,12 @@ import time
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 
 from src.models.apikey import verify_api_key
-from src.models.extract import (
-    ErrorResponse,
-    ExtractMetadata,
-    ExtractRequest,
-    ExtractResponse,
-)
+from src.models.extract import ExtractMetadata, ExtractRequest, ExtractResponse
 from src.services.extractor import ExtractionError, extractor_service
 
 router = APIRouter(tags=["extract"])
-limiter = Limiter(key_func=get_remote_address)
 
 
 def validate_api_key(request: Request) -> dict:
@@ -34,7 +26,6 @@ def validate_api_key(request: Request) -> dict:
 
 
 @router.post("/extract", response_model=ExtractResponse)
-@limiter.limit("100/minute")
 async def extract_data(
     request: Request,
     body: ExtractRequest,
@@ -43,7 +34,6 @@ async def extract_data(
     """Extract structured data from a URL using CSS/XPath selectors."""
     start = time.monotonic()
 
-    # Convert FieldSchema to dicts for the service
     fields = [
         {
             "name": f.name,
