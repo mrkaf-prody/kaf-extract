@@ -11,12 +11,18 @@ from src.routers import extract, health
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup/shutdown lifecycle."""
-    from playwright.async_api import async_playwright
-
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        await browser.close()
+    """Startup/shutdown lifecycle — verify Playwright browser works."""
+    try:
+        from playwright.async_api import async_playwright
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+            )
+            await browser.close()
+    except Exception as e:
+        import sys
+        print(f"WARNING: Browser check failed (non-fatal): {e}", file=sys.stderr)
     yield
 
 

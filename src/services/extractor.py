@@ -31,7 +31,10 @@ class ExtractorService:
         start = time.monotonic()
 
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=settings.playwright_headless)
+            browser = await p.chromium.launch(
+                headless=settings.playwright_headless,
+                args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+            )
             page = await browser.new_page()
 
             try:
