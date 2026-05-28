@@ -272,8 +272,55 @@ async def revoke_key(
 
 
 # ---------------------------------------------------------------------------
-# User endpoint (non-admin, lists own keys)
+# User endpoints (non-admin)
 # ---------------------------------------------------------------------------
+
+@router.post("/keys", response_model=CreateKeyResponse, status_code=status.HTTP_201_CREATED)
+async def create_my_key(
+    body: CreateKeyRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a new API key for the currently authenticated user.
+
+    The raw key is returned exactly once in this response.
+    It is stored as a bcrypt hash in the database.
+    """
+    raw_key = _generate_api_key()
+    key_hash = _hash_api_key(raw_key)
+
+    user_id = current_user["user_id"]
+    result = await db.execute(
+        select(User).where(User.id == user_id, User.status == "active")
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found or inactive",
+        )
+
+    api_key = ApiKey(
+        id=uuid.uuid4(),
+        user_id=user_id,
+        key_hash=key_hash,
+        label=body.label,
+        tier=body.tier,
+        rate_limit=body.rate_limit,
+        status="active",
+        created_at=datetime.now(UTC),
+    )
+    db.add(api_key)
+    await db.flush()
+
+    return CreateKeyResponse(
+        id=str(api_key.id),
+        label=api_key.label,
+        tier=api_key.tier,
+        rate_limit=api_key.rate_limit,
+        api_key=raw_key,
+    )
+
 
 @router.get("/keys", response_model=list[ApiKeyItem])
 async def list_my_keys(

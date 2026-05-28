@@ -1,12 +1,13 @@
 """Kaf Extract — API-First Data Extraction Micro-Service."""
 
+import os
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-import os
+from fastapi.responses import FileResponse, JSONResponse
 
 from src.routers import auth, extract, health, keys, metrics, subscriptions, vouchers, webhooks, admin_payments, schedules, integrations, organizations, usage
 
@@ -62,7 +63,7 @@ async def lifespan(app: FastAPI):
         import sys
         print(f"WARNING: Payment provider init failed (non-fatal): {e}", file=sys.stderr)
 
-    # Register dev API key if needed
+    # Skip dev API key registration in production — use JWT instead
     try:
         from src.models.apikey import _register_dev_key
         _register_dev_key()
@@ -123,12 +124,23 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# --- CORS Middleware ---
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://ai.kafcenter.com",
+        "https://extract.kafcenter.com",
+        "https://mgmt.kafcenter.com",
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "X-API-Key",
+        "X-Request-ID",
+    ],
     expose_headers=[
         "X-RateLimit-Limit",
         "X-RateLimit-Remaining",
@@ -138,14 +150,59 @@ app.add_middleware(
 )
 
 
-# Attach rate-limit headers from request.state to responses
+# --- Global Rate Limit Middleware ---
+
+_RATE_LIMIT_WINDOW = 60  # seconds
+_RATE_LIMIT_MAX = 100    # requests per window per IP
+_rate_limit_store: dict[str, list[float]] = {}
+
+
 @app.middleware("http")
-async def add_rate_limit_headers(request, call_next):
+async def global_rate_limit_middleware(request, call_next):
+    """Apply a simple in-memory fixed-window rate limit per client IP."""
+    client_ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    window_start = now - _RATE_LIMIT_WINDOW
+
+    # Get or init the request log for this IP
+    requests_log = _rate_limit_store.get(client_ip, [])
+    requests_log = [t for t in requests_log if t > window_start]
+    _rate_limit_store[client_ip] = requests_log
+
+    if len(requests_log) >= _RATE_LIMIT_MAX:
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Too many requests. Please try again later."},
+            headers={
+                "X-RateLimit-Limit": str(_RATE_LIMIT_MAX),
+                "X-RateLimit-Remaining": "0",
+                "X-RateLimit-Reset": str(int(now + _RATE_LIMIT_WINDOW)),
+                "Retry-After": str(_RATE_LIMIT_WINDOW),
+            },
+        )
+
+    requests_log.append(now)
+    response = await call_next(request)
+
+    # Attach rate-limit headers
+    remaining = _RATE_LIMIT_MAX - len(requests_log)
+    response.headers["X-RateLimit-Limit"] = str(_RATE_LIMIT_MAX)
+    response.headers["X-RateLimit-Remaining"] = str(remaining)
+    response.headers["X-RateLimit-Reset"] = str(int(now + _RATE_LIMIT_WINDOW))
+
+    return response
+
+
+# --- Rate-limit headers from extract-specific dependency ---
+
+@app.middleware("http")
+async def add_extract_rate_limit_headers(request, call_next):
+    """Attach rate-limit headers from request.state (set by extract deps)."""
     response = await call_next(request)
     headers = getattr(request.state, "rate_limit_headers", None)
     if headers:
         for key, value in headers.items():
-            response.headers[key] = value
+            response.headers[key] = str(value)
     return response
 
 
