@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import os
 
-from src.routers import auth, extract, health, keys, metrics, subscriptions, vouchers, webhooks, admin_payments, schedules, integrations, organizations
+from src.routers import auth, extract, health, keys, metrics, subscriptions, vouchers, webhooks, admin_payments, schedules, integrations, organizations, usage
 
 
 def _run_migrations_sync(connection, alembic_cfg):
@@ -162,6 +162,7 @@ app.include_router(subscriptions.router)
 app.include_router(vouchers.router)
 app.include_router(admin_payments.router)
 app.include_router(webhooks.router)
+app.include_router(usage.router, prefix="/api/v1")
 
 # ── Admin Dashboard (SPA) ──────────────────────────────────────────
 

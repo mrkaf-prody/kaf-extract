@@ -248,6 +248,19 @@ async def run_extraction(
         except Exception:
             logger.warning("Failed to cache extraction result", exc_info=True)
 
+        # Track usage (fire-and-forget — don't block the result)
+        if api_key_id:
+            try:
+                from src.services.usage_alerts import increment_usage
+                # Look up user_id from API key
+                from src.models.apikey import _key_registry
+                uid = _key_registry.get(api_key_id, {}).get("user_id")
+                if uid:
+                    from uuid import UUID
+                    await increment_usage(UUID(uid))
+            except Exception:
+                pass
+
         # Dispatch webhook if URL provided
         if webhook_url:
             try:

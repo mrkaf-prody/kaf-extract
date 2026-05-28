@@ -605,3 +605,53 @@ class OrganizationMember(Base):
             f"<OrganizationMember(org_id={self.org_id!r}, user_id={self.user_id!r}, "
             f"role={self.role!r})>"
         )
+
+
+class UsageAlert(Base):
+    """Per-user usage tracking and alert thresholds."""
+
+    __tablename__ = "usage_alerts"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    monthly_limit: Mapped[int] = mapped_column(Integer, default=1000, nullable=False)
+    alert_80_sent: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    alert_90_sent: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    alert_100_sent: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    hard_cap: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    current_usage: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
+    reset_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    user: Mapped["User"] = relationship("User")
+
+    def __repr__(self) -> str:
+        return (
+            f"<UsageAlert(user_id={self.user_id!r}, usage={self.current_usage}, "
+            f"limit={self.monthly_limit}), reset={self.reset_date!r})>"
+        )
