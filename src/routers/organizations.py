@@ -180,6 +180,19 @@ async def create_organization(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new organization. The creator becomes the owner."""
+    import traceback, sys
+    try:
+        return await _create_organization_impl(body, current_user, db)
+    except Exception as e:
+        traceback.print_exc(file=sys.stderr)
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}")
+
+
+async def _create_organization_impl(
+    body: CreateOrgRequest,
+    current_user: dict,
+    db: AsyncSession,
+) -> OrgResponse:
     # Check slug uniqueness
     existing = (
         await db.execute(
