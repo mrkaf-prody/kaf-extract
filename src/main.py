@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.routers import auth, extract, health, keys, metrics
+from src.routers import auth, extract, health, keys, metrics, subscriptions, vouchers, webhooks, admin_payments
 
 
 @asynccontextmanager
@@ -26,6 +26,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         import sys
         print(f"WARNING: Browser check failed (non-fatal): {e}", file=sys.stderr)
+
+    # Pre-load payment providers (triggers self-registration)
+    try:
+        import src.services.payments  # noqa: F401
+    except Exception as e:
+        import sys
+        print(f"WARNING: Payment provider init failed (non-fatal): {e}", file=sys.stderr)
 
     # Register dev API key if needed
     try:
@@ -105,3 +112,7 @@ app.include_router(auth.router)
 app.include_router(health.router)
 app.include_router(keys.router, prefix="/api/v1")
 app.include_router(metrics.router)
+app.include_router(subscriptions.router)
+app.include_router(vouchers.router)
+app.include_router(admin_payments.router)
+app.include_router(webhooks.router)

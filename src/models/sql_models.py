@@ -56,6 +56,13 @@ class User(Base):
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
         "RefreshToken", back_populates="user", cascade="all, delete-orphan"
     )
+    subscriptions: Mapped[list["Subscription"]] = relationship(
+        "Subscription", back_populates="user", cascade="all, delete-orphan"
+    )
+    trial: Mapped["Trial | None"] = relationship(
+        "Trial", back_populates="user", uselist=False,
+        cascade="all, delete-orphan", foreign_keys="[Trial.user_id]",
+    )
 
     def __repr__(self) -> str:
         return f"<User(id={self.id!r}, email={self.email!r})>"
@@ -161,3 +168,270 @@ class UsageLog(Base):
 
     def __repr__(self) -> str:
         return f"<UsageLog(id={self.id!r}, endpoint={self.endpoint!r})>"
+
+
+# ---------------------------------------------------------------------------
+# Phase 4: Payment & Subscription models
+# ---------------------------------------------------------------------------
+
+class Subscription(Base):
+    """User subscription — maps a user to a plan tier and provider details."""
+
+    __tablename__ = "subscriptions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    plan: Mapped[str] = mapped_column(
+        Enum("hobby", "pro", "enterprise", name="subscription_plan"),
+        default="hobby",
+        nullable=False,
+    )
+    status: Mapped[str] = mapped_column(
+        Enum(
+            "active",
+            "canceled",
+            "expired",
+            "past_due",
+            "paused",
+            name="subscription_status",
+        ),
+        default="active",
+        nullable=False,
+    )
+    provider: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="manual"
+    )
+    provider_subscription_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True
+    )
+    provider_customer_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True
+    )
+    current_period_start: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    current_period_end: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    canceled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    # Relationships
+    user: Mapped["User"] = relationship("User", back_populates="subscriptions")
+
+    def __repr__(self) -> str:
+        return f"<Subscription(id={self.id!r}, plan={self.plan!r}, status={self.status!r})>"
+
+
+class Trial(Base):
+    """Trial period for new users — 7-day, 100 extractions, no credit card."""
+
+    __tablename__ = "trials"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    status: Mapped[str] = mapped_column(
+        Enum("active", "expired", "extended", name="trial_status"),
+        default="active",
+        nullable=False,
+    )
+    extractions_total: Mapped[int] = mapped_column(Integer, default=100, nullable=False)
+    extractions_used: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    reminder_sent_day3: Mapped[bool] = mapped_column(default=False, nullable=False)
+    reminder_sent_day6: Mapped[bool] = mapped_column(default=False, nullable=False)
+    extended_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    extended_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    # Relationships
+    user: Mapped["User"] = relationship(
+        "User", back_populates="trial", foreign_keys=[user_id]
+    )
+
+    @property
+    def extractions_remaining(self) -> int:
+        return max(0, self.extractions_total - self.extractions_used)
+
+    def __repr__(self) -> str:
+        return (
+            f"<Trial(id={self.id!r}, status={self.status!r}, "
+            f"remaining={self.extractions_remaining})>"
+        )
+
+
+class Invoice(Base):
+    """Generated invoice for a payment."""
+
+    __tablename__ = "invoices"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    subscription_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("subscriptions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    amount: Mapped[int] = mapped_column(Integer, nullable=False)  # cents
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="usd")
+    status: Mapped[str] = mapped_column(
+        Enum("pending", "paid", "void", "refunded", name="invoice_status"),
+        default="pending",
+        nullable=False,
+    )
+    provider: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="manual"
+    )
+    provider_invoice_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True
+    )
+    plan: Mapped[str] = mapped_column(String(50), nullable=False)
+    html_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    paid_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<Invoice(id={self.id!r}, amount={self.amount}, "
+            f"status={self.status!r})>"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Phase 4: Voucher system models
+# ---------------------------------------------------------------------------
+
+
+class Voucher(Base):
+    """Promotional voucher code — redeemable for a subscription plan."""
+
+    __tablename__ = "vouchers"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    code: Mapped[str] = mapped_column(
+        String(64), unique=True, nullable=False, index=True
+    )
+    plan: Mapped[str] = mapped_column(String(50), nullable=False)
+    duration_days: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
+    extraction_credits: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    max_uses: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    used_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    status: Mapped[str] = mapped_column(
+        Enum("active", "expired", "exhausted", "revoked", name="voucher_status"),
+        default="active",
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    # Relationships
+    redemptions: Mapped[list["VoucherRedemption"]] = relationship(
+        "VoucherRedemption", back_populates="voucher", cascade="all, delete-orphan"
+    )
+    creator: Mapped["User | None"] = relationship(
+        "User", foreign_keys=[created_by]
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<Voucher(id={self.id!r}, code={self.code!r}, "
+            f"plan={self.plan!r}, status={self.status!r})>"
+        )
+
+
+class VoucherRedemption(Base):
+    """Record of a voucher being redeemed by a user."""
+
+    __tablename__ = "voucher_redemptions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    voucher_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("vouchers.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    redeemed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+
+    # Relationships
+    voucher: Mapped["Voucher"] = relationship(
+        "Voucher", back_populates="redemptions"
+    )
+    user: Mapped["User"] = relationship("User")
+
+    def __repr__(self) -> str:
+        return (
+            f"<VoucherRedemption(id={self.id!r}, "
+            f"voucher_id={self.voucher_id!r}, user_id={self.user_id!r})>"
+        )
