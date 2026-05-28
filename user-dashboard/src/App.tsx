@@ -16,7 +16,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
         Loading...
       </div>
     );
-  if (!user) return <Navigate to="/login" />;
+    if (!user) return <Navigate to="/dashboard/login" />;
   return <>{children}</>;
 };
 
