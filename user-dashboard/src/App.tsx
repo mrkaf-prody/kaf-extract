@@ -21,12 +21,12 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 };
 
 const App: React.FC = () => (
-  <BrowserRouter>
+  <BrowserRouter basename="/dashboard">
     <AuthProvider>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route
-          path="/dashboard"
+          path="/"
           element={
             <ProtectedRoute>
               <DashboardLayout />
@@ -38,7 +38,7 @@ const App: React.FC = () => (
           <Route path="usage" element={<UsagePage />} />
           <Route path="billing" element={<BillingPage />} />
         </Route>
-        <Route path="*" element={<Navigate to="/dashboard" />} />
+        <Route path="/*" element={<Navigate to="/" />} />
       </Routes>
     </AuthProvider>
   </BrowserRouter>
