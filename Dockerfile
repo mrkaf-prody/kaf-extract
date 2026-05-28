@@ -4,7 +4,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget ca-certificates fonts-liberation libasound2 libatk-bridge2.0-0 \
     libatk1.0-0 libcups2 libdbus-1-3 libdrm2 libgbm1 libgtk-3-0 \
     libnspr4 libnss3 libu2f-udev libxcomposite1 libxdamage1 libxfixes3 \
-    libxkbcommon0 libxrandr2 xdg-utils \
+    libxkbcommon0 libxrandr2 xdg-utils curl gnupg \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -16,6 +18,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Install Crawl4AI browsers (bundled Playwright Chromium)
 RUN python3 -m crawl4ai install 2>/dev/null || python3 -m playwright install chromium
 
+# Build user dashboard React SPA
+COPY user-dashboard/package.json user-dashboard/package-lock.json* ./user-dashboard/
+RUN cd user-dashboard && npm install
+COPY user-dashboard/ ./user-dashboard/
+RUN cd user-dashboard && npm run build
+
 COPY src/ ./src/
 COPY alembic.ini .
 COPY alembic/ ./alembic/
@@ -23,6 +31,9 @@ RUN mkdir -p /app/data
 
 # Ensure admin_static is included (built React admin dashboard)
 RUN mkdir -p /app/src/admin_static
+
+# Include user dashboard build
+COPY user-dashboard/dist/ ./user-dashboard/dist/
 
 EXPOSE 8000
 

@@ -194,3 +194,29 @@ if os.path.isdir(ADMIN_DIR):
         @app.get("/icons.svg", include_in_schema=False)
         async def _serve_icons():
             return FileResponse(ic_path)
+
+# ── User Dashboard (SPA) ──────────────────────────────────────────
+
+DASHBOARD_DIR = os.path.join(os.path.dirname(__file__), "..", "user-dashboard", "dist")
+
+@app.get("/dashboard/{full_path:path}", include_in_schema=False)
+async def dashboard_spa_fallback(full_path: str):
+    """Serve user dashboard SPA — fallback to index.html for client-side routing."""
+    file_path = os.path.join(DASHBOARD_DIR, full_path)
+    if os.path.isfile(file_path):
+        return FileResponse(file_path)
+    return FileResponse(os.path.join(DASHBOARD_DIR, "index.html"))
+
+@app.get("/dashboard", include_in_schema=False)
+async def dashboard_index():
+    return FileResponse(os.path.join(DASHBOARD_DIR, "index.html"))
+
+if os.path.isdir(os.path.join(DASHBOARD_DIR, "assets")):
+    app.mount("/dashboard/assets", StaticFiles(directory=os.path.join(DASHBOARD_DIR, "assets")), name="dashboard_assets")
+
+# Serve dashboard favicon to avoid 404 noise
+dashboard_fv = os.path.join(DASHBOARD_DIR, "favicon.svg")
+if os.path.isfile(dashboard_fv):
+    @app.get("/dashboard/favicon.svg", include_in_schema=False)
+    async def _serve_dash_favicon():
+        return FileResponse(dashboard_fv)
