@@ -180,19 +180,6 @@ async def create_organization(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new organization. The creator becomes the owner."""
-    import traceback, sys
-    try:
-        return await _create_organization_impl(body, current_user, db)
-    except Exception as e:
-        traceback.print_exc(file=sys.stderr)
-        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}")
-
-
-async def _create_organization_impl(
-    body: CreateOrgRequest,
-    current_user: dict,
-    db: AsyncSession,
-) -> OrgResponse:
     # Check slug uniqueness
     existing = (
         await db.execute(
@@ -205,7 +192,7 @@ async def _create_organization_impl(
             detail=f"Slug '{body.slug}' is already taken. Choose another.",
         )
 
-    user_id = _uuid.UUID(current_user["user_id"])
+    user_id = current_user["user_id"]
     org_id = _uuid.uuid4()
 
     org = Organization(
@@ -236,7 +223,7 @@ async def list_organizations(
     db: AsyncSession = Depends(get_db),
 ):
     """List all organizations the current user belongs to."""
-    user_id = _uuid.UUID(current_user["user_id"])
+    user_id = current_user["user_id"]
 
     # Find all orgs where user is a member
     member_rows = (
