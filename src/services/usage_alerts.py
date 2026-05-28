@@ -66,7 +66,7 @@ async def increment_usage(
                 current_usage=0,
             )
             db.add(alert)
-            await db.flush()
+            await db.commit()
 
         # New month reset
         if now >= alert.reset_date:
@@ -116,7 +116,7 @@ async def increment_usage(
             if alert.hard_cap and alert.current_usage >= alert.hard_cap:
                 hard_capped = True
 
-        await db.flush()
+        await db.commit()
 
         return {
             "current_usage": alert.current_usage,
