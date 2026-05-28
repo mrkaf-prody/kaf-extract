@@ -1,14 +1,41 @@
 version: "3.9"
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: kafextract
+      POSTGRES_PASSWORD: kafextract
+      POSTGRES_DB: kafextract
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kafextract"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   api:
     build: .
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=sqlite:///./data/kaf-extract.db
+      - DATABASE_URL=postgresql+asyncpg://kafextract:kafextract@postgres:5432/kafextract
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production-use-a-long-random-string}
+      - JWT_ALGORITHM=HS256
+      - JWT_EXPIRE_MINUTES=30
+      - JWT_REFRESH_EXPIRE_DAYS=7
       - DEV_API_KEY=${DEV_API_KEY:-kaf-extract-dev-key-change-in-production}
       - PLAYWRIGHT_HEADLESS=true
     volumes:
       - ./data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  pgdata:

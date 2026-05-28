@@ -12,7 +12,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-RUN python3 -m playwright install chromium
+# Crawl4AI bundles its own Playwright — install browsers via its CLI
+RUN python3 -m crawl4ai install
 
 COPY src/ ./src/
 RUN mkdir -p /app/data

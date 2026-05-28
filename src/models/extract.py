@@ -9,15 +9,34 @@ class FieldSchema(BaseModel):
     """A single field to extract from a page."""
 
     name: str = Field(..., description="Name of the field in the output JSON")
-    selector: str = Field(..., description="CSS or XPath selector")
-    type: str = Field(default="text", description="Extraction type: text, html, attribute, exists")
-    attribute: str | None = Field(default=None, description="Attribute name when type=attribute")
+    selector: str = Field(
+        default="",
+        description="CSS or XPath selector. Required for text/html/attribute/exists types. "
+                    "Ignored for markdown, screenshot, and ai types.",
+    )
+    type: str = Field(
+        default="text",
+        description="Extraction type: text, html, attribute, exists, markdown, screenshot, ai",
+    )
+    attribute: str | None = Field(
+        default=None, description="Attribute name when type=attribute"
+    )
+    instruction: str | None = Field(
+        default=None,
+        description="Natural-language instruction for AI-based extraction (type=ai). "
+                    "E.g., 'Extract the main article title' or 'Get the product price as a number'.",
+    )
 
 
 class ExtractSchema(BaseModel):
     """Schema defining what to extract from a page."""
 
     fields: list[FieldSchema] = Field(..., min_length=1, description="Fields to extract")
+    base_selector: str | None = Field(
+        default=None,
+        description="Optional CSS selector for a common container element. "
+                    "When set, all field selectors are relative to this element.",
+    )
 
 
 class ExtractRequest(BaseModel):
