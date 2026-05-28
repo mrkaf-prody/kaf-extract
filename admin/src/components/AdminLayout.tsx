@@ -3,12 +3,13 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
   LayoutDashboard, Users, CreditCard, Settings, Ticket, Activity,
-  BarChart3, FileText, LogOut, Shield
+  BarChart3, FileText, LogOut, Shield, User
 } from 'lucide-react';
 
 const navItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'Overview', end: true },
   { to: '/admin/users', icon: Users, label: 'Users' },
+  { to: '/admin/profile', icon: User, label: 'Profile' },
   { to: '/admin/subscriptions', icon: CreditCard, label: 'Subscriptions' },
   { to: '/admin/vouchers', icon: Ticket, label: 'Vouchers' },
   { to: '/admin/monitor', icon: Activity, label: 'API Monitor' },
