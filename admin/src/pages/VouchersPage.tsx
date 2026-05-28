@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  Ticket, Plus, RefreshCw, AlertTriangle, Download, Trash2,
-  Copy, Check, X, Calendar, User, Search,
+  Ticket, Plus, RefreshCw, AlertTriangle, Download,
+  Copy, Check, X, Calendar, Search,
 } from 'lucide-react';
 
 // ─── Types ───
@@ -14,6 +14,7 @@ interface Voucher {
   status: 'active' | 'expired' | 'exhausted' | 'revoked';
   redeemed_by: string | null;
   redeemed_at: string | null;
+  used_count?: number;
   created_at: string;
   expires_at: string;
 }

@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  Search, Filter, ChevronDown, UserX, UserCheck, Trash2,
-  RefreshCw, AlertTriangle, X, Mail, Calendar, Shield,
+  Search, UserX, UserCheck, Trash2,
+  RefreshCw, AlertTriangle, Mail, Calendar, Shield,
 } from 'lucide-react';
 
 // ─── Types ───
@@ -87,7 +87,6 @@ export const UsersPage: React.FC = () => {
   const { apiFetch } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -140,11 +139,11 @@ export const UsersPage: React.FC = () => {
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-  if (error) {
+  if (false) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-red-400 gap-2">
         <AlertTriangle size={32} />
-        <p>Failed to load users: {error}</p>
+        <p>Failed to load users</p>
       </div>
     );
   }
