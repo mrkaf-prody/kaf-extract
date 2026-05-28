@@ -5,7 +5,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pyotp
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select, delete
@@ -519,6 +519,51 @@ async def admin_reset(
 
     return AdminResetResponse(
         message="Admin password has been reset successfully.",
+        new_password=reset_token,
+    )
+
+
+@router.post("/admin/init-reset", response_model=AdminResetResponse)
+async def admin_init_reset(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Bootstrap admin password reset — no auth required.
+
+    Uses ADMIN_RESET_TOKEN as a shared secret via X-Reset-Token header.
+    This is the one-time recovery mechanism when no admin is logged in.
+    Sets admin password to the value of ADMIN_RESET_TOKEN.
+    """
+    sent_token = request.headers.get("X-Reset-Token", "")
+    reset_token = os.environ.get("ADMIN_RESET_TOKEN")
+
+    if not reset_token:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="ADMIN_RESET_TOKEN environment variable is not set.",
+        )
+
+    if sent_token != reset_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid reset token.",
+        )
+
+    result = await db.execute(
+        select(User).where(User.email == "admin@kafcenter.com")
+    )
+    admin_user = result.scalar_one_or_none()
+    if not admin_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Admin user not found.",
+        )
+
+    admin_user.password_hash = _hash_password(reset_token)
+    await db.flush()
+
+    return AdminResetResponse(
+        message="Admin password has been reset. Use this password to log in, then change it immediately.",
         new_password=reset_token,
     )
 
