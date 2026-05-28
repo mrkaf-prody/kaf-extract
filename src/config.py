@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
 
+    # Redis
+    redis_url: str = "redis://redis:6379/0"
+
     # Rate limiting
     rate_limit_requests: int = 100
     rate_limit_window_seconds: int = 60
