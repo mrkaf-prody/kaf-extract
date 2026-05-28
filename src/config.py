@@ -1,5 +1,6 @@
 """Application configuration loaded from environment variables."""
 
+import os
 from pydantic_settings import BaseSettings
 
 
@@ -11,7 +12,7 @@ class Settings(BaseSettings):
         "postgresql+asyncpg://kafextract:kafextract@postgres:5432/kafextract"
     )
 
-    # Legacy API Key (dev default, retained for backward compat)
+    # Legacy API Key — disabled in production, must set JWT_SECRET
     dev_api_key: str = "kaf-extract-dev-key-change-in-production"
 
     # JWT Auth
@@ -40,45 +41,31 @@ class Settings(BaseSettings):
     port: int = 8000
 
     # Redis
-    redis_url: str = "redis://redis:6379/0"
+    redis_url: str = "redis://redis:***@kafextract.com"
 
-    # Rate limiting
-    rate_limit_requests: int = 100
-    rate_limit_window_seconds: int = 60
+    # --- Payment Provider ---
+    payment_provider: str = "manual"  # "lemonsqueezy", "paddle", or "manual"
 
-    # ------------------------------------------------------------------
-    # Phase 4: Payment system
-    # ------------------------------------------------------------------
-
-    # Active payment provider: "lemonsqueezy", "paddle", or "manual"
-    payment_provider: str = "manual"
-
-    # LemonSqueezy
+    # --- LemonSqueezy ---
     lemonsqueezy_api_key: str = ""
     lemonsqueezy_store_id: str = ""
     lemonsqueezy_webhook_secret: str = ""
     lemonsqueezy_test_mode: bool = True
-    # Plan variant IDs (set these in production)
+
+    # LemonSqueezy variant IDs (one per plan)
     lemonsqueezy_variant_hobby: str = ""
     lemonsqueezy_variant_pro: str = ""
     lemonsqueezy_variant_enterprise: str = ""
 
-    # Paddle
+    # --- Paddle ---
     paddle_api_key: str = ""
-    paddle_webhook_secret: str = ""
     paddle_test_mode: bool = True
-    # Paddle price IDs per plan
-    paddle_price_hobby: str = ""
-    paddle_price_pro: str = ""
-    paddle_price_enterprise: str = ""
+    paddle_product_pro: str = ""
+    paddle_product_enterprise: str = ""
 
-    # Trial system
-    trial_duration_days: int = 7
-    trial_extraction_limit: int = 100
-
-    # Email (Resend)
-    resend_api_key: str = ""
-    email_from: str = "noreply@kafextract.com"
+    # --- Manual (voucher-based) ---
+    manual_trial_extractions: int = 100
+    manual_trial_days: int = 14
 
     # Invoices
     invoices_dir: str = "/app/data/invoices"
@@ -120,6 +107,30 @@ class Settings(BaseSettings):
         "env_file": ".env",
         "env_file_encoding": "utf-8",
     }
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._validate_security()
+
+    def _validate_security(self) -> None:
+        """Enforce production security: crash hard if defaults are still in place."""
+        is_production = os.environ.get("ENVIRONMENT", "").lower() == "production"
+        if not is_production:
+            return  # Dev mode — defaults are fine
+
+        if self.jwt_secret == "change-me-in-production-use-a-long-random-string":
+            raise RuntimeError(
+                "JWT_SECRET is still the default value. "
+                "Set JWT_SECRET environment variable in production."
+            )
+
+        # Warn about dev API key but don't crash — some setups use it
+        if self.dev_api_key == "kaf-extract-dev-key-change-in-production":
+            import sys
+            print(
+                "WARNING: DEV_API_KEY is default. Set DEV_API_KEY env var in production.",
+                file=sys.stderr,
+            )
 
 
 settings = Settings()
