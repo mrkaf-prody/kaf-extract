@@ -42,15 +42,6 @@ async def get_usage(
     db: AsyncSession = Depends(get_db),
 ):
     """Get current usage stats for the authenticated user."""
-    import traceback, sys
-    try:
-        return await _get_usage_impl(current_user, db)
-    except Exception as e:
-        traceback.print_exc(file=sys.stderr)
-        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}")
-
-
-async def _get_usage_impl(current_user, db):
     user_id = current_user["user_id"]
 
     result = await db.execute(
