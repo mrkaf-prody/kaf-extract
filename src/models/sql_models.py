@@ -435,3 +435,83 @@ class VoucherRedemption(Base):
             f"<VoucherRedemption(id={self.id!r}, "
             f"voucher_id={self.voucher_id!r}, user_id={self.user_id!r})>"
         )
+
+
+class ScheduledExtraction(Base):
+    """User-defined recurring extraction schedule.
+
+    Supports cron expressions for recurring scraping jobs.
+    Tracks last run and next run times. Results delivered via webhook or email.
+    """
+
+    __tablename__ = "scheduled_extractions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(
+        String(255), nullable=False, doc="Human-readable name for this schedule"
+    )
+    cron_expression: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+        doc="Standard cron expression (e.g., '0 */6 * * *' for every 6 hours)",
+    )
+    url: Mapped[str] = mapped_column(
+        Text, nullable=False, doc="Target URL to extract"
+    )
+    schema_json: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        doc="JSON-serialized extraction schema (fields array)",
+    )
+    webhook_url: Mapped[str | None] = mapped_column(
+        Text, nullable=True, doc="Optional webhook to POST results to"
+    )
+    email_on_complete: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, doc="Email to notify on completion"
+    )
+    status: Mapped[str] = mapped_column(
+        Enum("active", "paused", "completed", "error", name="schedule_status"),
+        default="active",
+        nullable=False,
+    )
+    next_run_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=True, doc="Next scheduled run time"
+    )
+    last_run_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, doc="Last execution timestamp"
+    )
+    last_job_id: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, doc="Last arq job ID for status lookup"
+    )
+    total_runs: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", doc="Total number of executions"
+    )
+    error_runs: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", doc="Number of failed executions"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    # Relationships
+    user: Mapped["User"] = relationship("User")
+
+    def __repr__(self) -> str:
+        return (
+            f"<ScheduledExtraction(id={self.id!r}, name={self.name!r}, "
+            f"cron={self.cron_expression!r}, status={self.status!r})>"
+        )

@@ -347,6 +347,88 @@ class KafExtract:
         self._raise_for_status(resp)
         return resp.json()
 
+    # ── Scheduled Extractions ──────────────────────────────────────
+
+    async def create_schedule(
+        self,
+        name: str,
+        cron_expression: str,
+        url: str,
+        fields: list[dict[str, Any]],
+        webhook_url: str | None = None,
+        email_on_complete: str | None = None,
+    ) -> dict:
+        """Create a recurring extraction schedule.
+
+        Args:
+            name: Human-readable name (e.g., "Daily Price Check").
+            cron_expression: Standard cron. '0 */6 * * *' = every 6 hours.
+            url: Target URL to extract on schedule.
+            fields: List of field definitions (same as extract()).
+            webhook_url: Optional webhook to POST results to.
+            email_on_complete: Optional email to notify.
+
+        Returns:
+            Schedule object with id, status, next_run_at, etc.
+
+        Example:
+            schedule = await client.create_schedule(
+                name="Price Monitor",
+                cron_expression="0 */6 * * *",
+                url="https://shop.example.com/product",
+                fields=[{"name": "price", "selector": ".price", "type": "text"}],
+                webhook_url="https://myapp.com/webhooks/kaf",
+            )
+        """
+        client = await self._get_client()
+        resp = await client.post(
+            "/api/v1/extract/schedule",
+            json={
+                "name": name,
+                "cron_expression": cron_expression,
+                "url": url,
+                "fields": fields,
+                "webhook_url": webhook_url,
+                "email_on_complete": email_on_complete,
+            },
+        )
+        self._raise_for_status(resp)
+        return resp.json()
+
+    async def list_schedules(self) -> dict:
+        """List all scheduled extractions."""
+        client = await self._get_client()
+        resp = await client.get("/api/v1/extract/schedules")
+        self._raise_for_status(resp)
+        return resp.json()
+
+    async def get_schedule(self, schedule_id: str) -> dict:
+        """Get a single schedule by ID."""
+        client = await self._get_client()
+        resp = await client.get(f"/api/v1/extract/schedule/{schedule_id}")
+        self._raise_for_status(resp)
+        return resp.json()
+
+    async def delete_schedule(self, schedule_id: str) -> None:
+        """Delete a scheduled extraction."""
+        client = await self._get_client()
+        resp = await client.delete(f"/api/v1/extract/schedule/{schedule_id}")
+        self._raise_for_status(resp)
+
+    async def pause_schedule(self, schedule_id: str) -> dict:
+        """Pause a scheduled extraction."""
+        client = await self._get_client()
+        resp = await client.post(f"/api/v1/extract/schedule/{schedule_id}/pause")
+        self._raise_for_status(resp)
+        return resp.json()
+
+    async def resume_schedule(self, schedule_id: str) -> dict:
+        """Resume a paused scheduled extraction."""
+        client = await self._get_client()
+        resp = await client.post(f"/api/v1/extract/schedule/{schedule_id}/resume")
+        self._raise_for_status(resp)
+        return resp.json()
+
     # ── Health ─────────────────────────────────────────────────────
 
     async def health(self) -> dict:

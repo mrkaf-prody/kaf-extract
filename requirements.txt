@@ -22,4 +22,6 @@ email-validator>=2.2.0
 # Redis caching + async job queue
 redis[hiredis]>=5.0
 arq>=0.25
+# Scheduling
+croniter>=5.0
 

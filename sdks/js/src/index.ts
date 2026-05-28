@@ -341,6 +341,65 @@ export class KafExtract {
     );
   }
 
+  // ── Scheduled Extractions ────────────────────────────────────
+
+  async createSchedule(options: {
+    name: string;
+    cronExpression: string;
+    url: string;
+    fields: FieldSchema[];
+    webhookUrl?: string;
+    emailOnComplete?: string;
+  }): Promise<Record<string, unknown>> {
+    return this.request<Record<string, unknown>>(
+      "POST",
+      "/api/v1/extract/schedule",
+      {
+        name: options.name,
+        cron_expression: options.cronExpression,
+        url: options.url,
+        fields: options.fields,
+        webhook_url: options.webhookUrl,
+        email_on_complete: options.emailOnComplete,
+      }
+    );
+  }
+
+  async listSchedules(): Promise<{ schedules: Record<string, unknown>[]; total: number }> {
+    return this.request<{ schedules: Record<string, unknown>[]; total: number }>(
+      "GET",
+      "/api/v1/extract/schedules"
+    );
+  }
+
+  async getSchedule(scheduleId: string): Promise<Record<string, unknown>> {
+    return this.request<Record<string, unknown>>(
+      "GET",
+      `/api/v1/extract/schedule/${scheduleId}`
+    );
+  }
+
+  async deleteSchedule(scheduleId: string): Promise<void> {
+    await this.request<void>(
+      "DELETE",
+      `/api/v1/extract/schedule/${scheduleId}`
+    );
+  }
+
+  async pauseSchedule(scheduleId: string): Promise<Record<string, unknown>> {
+    return this.request<Record<string, unknown>>(
+      "POST",
+      `/api/v1/extract/schedule/${scheduleId}/pause`
+    );
+  }
+
+  async resumeSchedule(scheduleId: string): Promise<Record<string, unknown>> {
+    return this.request<Record<string, unknown>>(
+      "POST",
+      `/api/v1/extract/schedule/${scheduleId}/resume`
+    );
+  }
+
   // ── Health ───────────────────────────────────────────────────
 
   async health(): Promise<Record<string, unknown>> {

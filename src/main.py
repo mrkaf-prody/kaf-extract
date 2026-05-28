@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import os
 
-from src.routers import auth, extract, health, keys, metrics, subscriptions, vouchers, webhooks, admin_payments
+from src.routers import auth, extract, health, keys, metrics, subscriptions, vouchers, webhooks, admin_payments, schedules
 
 
 def _run_migrations_sync(connection, alembic_cfg):
@@ -69,7 +69,22 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
 
+    # Start background scheduler for recurring extractions
+    try:
+        from src.services.scheduler import start_scheduler
+        start_scheduler()
+    except Exception as e:
+        import sys
+        print(f"WARNING: Scheduler start failed (non-fatal): {e}", file=sys.stderr)
+
     yield
+
+    # Stop scheduler
+    try:
+        from src.services.scheduler import stop_scheduler
+        await stop_scheduler()
+    except Exception:
+        pass
 
     # Clean up on shutdown
     try:
@@ -144,6 +159,7 @@ app.include_router(subscriptions.router)
 app.include_router(vouchers.router)
 app.include_router(admin_payments.router)
 app.include_router(webhooks.router)
+app.include_router(schedules.router, prefix="/api/v1")
 
 # ── Admin Dashboard (SPA) ──────────────────────────────────────────
 
