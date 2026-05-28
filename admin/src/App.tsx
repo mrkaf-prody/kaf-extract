@@ -12,6 +12,7 @@ import { FeaturesPage } from './pages/FeaturesPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { PaymentsPage } from './pages/PaymentsPage';
 import { AuditLogsPage } from './pages/AuditLogsPage';
+import { DashboardPage } from './pages/DashboardPage';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
@@ -25,6 +26,7 @@ const App: React.FC = () => (
     <AuthProvider>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
           <Route index element={<OverviewPage />} />
           <Route path="users" element={<UsersPage />} />

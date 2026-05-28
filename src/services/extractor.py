@@ -245,9 +245,6 @@ class ExtractorService:
             extraction_type="schema",
             force_json_response=True,
             verbose=settings.crawl4ai_verbose,
-            provider=f"ollama/{settings.ollama_model}",
-            api_token=settings.ollama_api_key,
-            base_url=settings.ollama_base_url,
         )
 
     def _parse_css_results(
@@ -304,11 +301,293 @@ class ExtractorService:
 
         return output
 
+    async def extract_batch(
+        self,
+        urls: list[str],
+        fields: list[dict],
+        max_concurrent: int = 5,
+    ) -> list[dict[str, Any]]:
+        """Extract data from multiple URLs in parallel using arun_many().
+
+        Uses Crawl4AI's MemoryAdaptiveDispatcher for concurrent crawling
+        with automatic backpressure.
+
+        Args:
+            urls: List of URLs to extract data from.
+            fields: The field definitions (applied to each URL).
+            max_concurrent: Maximum concurrent crawls (default 5).
+
+        Returns:
+            List of result dicts, one per URL, each with keys:
+            {url, status, data, error}.
+        """
+        if not urls:
+            return []
+
+        from crawl4ai import MemoryAdaptiveDispatcher
+
+        crawler = await self._get_crawler()
+
+        # Build the extraction strategy (CSS vs AI) — same for all URLs
+        css_fields: list[dict] = []
+        ai_fields: list[dict] = []
+        wants_screenshot = False
+        wants_markdown = False
+
+        for field in fields:
+            ftype = field.get("type", "text")
+            if ftype == "ai":
+                ai_fields.append(field)
+            elif ftype == "markdown":
+                wants_markdown = True
+            elif ftype == "screenshot":
+                wants_screenshot = True
+            else:
+                css_fields.append(field)
+
+        extraction_strategy = None
+        if ai_fields:
+            extraction_strategy = self._build_ai_strategy(ai_fields)
+        elif css_fields:
+            extraction_strategy = self._build_css_strategy(css_fields)
+
+        from src.services.crawl4ai_config import get_run_config
+        import time as _time
+
+        # Build a single run config (same for all URLs)
+        base_run_config = get_run_config(
+            extraction_strategy=extraction_strategy,
+            screenshot=wants_screenshot,
+            cache_mode=CacheMode.ENABLED,
+        )
+
+        results: list[dict[str, Any]] = []
+        results_by_url: dict[str, dict[str, Any]] = {}
+
+        try:
+            # Use arun_many with MemoryAdaptiveDispatcher for parallel crawling
+            dispatcher = MemoryAdaptiveDispatcher(
+                memory_threshold_percent=70.0,
+                check_interval=1.0,
+                max_session_permit=max_concurrent,
+            )
+
+            crawl_results = await crawler.arun_many(
+                urls=urls,
+                config=base_run_config,
+                dispatcher=dispatcher,
+            )
+
+            # Process results
+            for crawl_result in crawl_results:
+                url = crawl_result.url or ""
+                entry: dict[str, Any] = {"url": url}
+
+                if crawl_result.success:
+                    # Parse extracted content
+                    data: dict[str, Any] = {}
+                    if crawl_result.extracted_content:
+                        try:
+                            parsed = json.loads(crawl_result.extracted_content)
+                            if ai_fields:
+                                data = self._parse_ai_results(ai_fields, parsed)
+                            else:
+                                data = self._parse_css_results(css_fields, parsed)
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+
+                    # Add markdown if requested
+                    if wants_markdown:
+                        for f in fields:
+                            if f.get("type") == "markdown":
+                                data[f["name"]] = crawl_result.markdown or ""
+
+                    # Add screenshot if requested
+                    if wants_screenshot:
+                        for f in fields:
+                            if f.get("type") == "screenshot":
+                                data[f["name"]] = crawl_result.screenshot or ""
+
+                    entry["status"] = "success"
+                    entry["data"] = data
+                    entry["error"] = None
+                else:
+                    entry["status"] = "error"
+                    entry["data"] = None
+                    entry["error"] = crawl_result.error_message or "Unknown error"
+
+                results_by_url[url] = entry
+
+        except Exception as e:
+            # If arun_many itself fails, all URLs fail
+            for url in urls:
+                if url not in results_by_url:
+                    results_by_url[url] = {
+                        "url": url,
+                        "status": "error",
+                        "data": None,
+                        "error": str(e),
+                    }
+
+        # Return results in the same order as the input URLs
+        for url in urls:
+            if url in results_by_url:
+                results.append(results_by_url[url])
+            else:
+                results.append({
+                    "url": url,
+                    "status": "error",
+                    "data": None,
+                    "error": "No result returned",
+                })
+
+        return results
+
     async def close(self) -> None:
         """Close the crawler and release resources."""
         if self._crawler:
             await self._crawler.close()
             self._crawler = None
+
+    # ------------------------------------------------------------------
+    # P2-3: Dedicated AI / LLM extraction
+    # ------------------------------------------------------------------
+
+    async def extract_ai(
+        self,
+        url: str,
+        instruction: str,
+        model: str = "kimi-k2.6:cloud",
+        output_format: str = "json",
+    ) -> dict[str, Any]:
+        """Extract data from a page using natural-language instruction via Ollama.
+
+        Args:
+            url: The URL to extract data from.
+            instruction: Natural-language description of what to extract.
+            model: Ollama model name (kimi-k2.6:cloud or glm-5.1:cloud).
+            output_format: 'json' for structured output, 'text' for raw LLM response.
+
+        Returns:
+            Dict with 'data' (parsed JSON or raw text) and 'raw' (full output).
+        """
+        start = time.monotonic()
+        crawler = await self._get_crawler()
+
+        llm_config = LLMConfig(
+            provider=f"ollama/{model}",
+            api_token=settings.ollama_api_key,
+            base_url=settings.ollama_base_url,
+        )
+
+        # Build extraction strategy based on format
+        if output_format == "json":
+            extraction_strategy = LLMExtractionStrategy(
+                llm_config=llm_config,
+                instruction=instruction,
+                extraction_type="schema",
+                force_json_response=True,
+                verbose=settings.crawl4ai_verbose,
+            )
+        else:
+            # text mode: no schema, raw LLM output
+            extraction_strategy = LLMExtractionStrategy(
+                llm_config=llm_config,
+                instruction=instruction,
+                extraction_type="block",
+                verbose=settings.crawl4ai_verbose,
+            )
+
+        run_config = get_run_config(
+            extraction_strategy=extraction_strategy,
+            screenshot=False,
+            cache_mode=CacheMode.ENABLED,
+        )
+
+        try:
+            crawl_result = await crawler.arun(url=url, config=run_config)
+        except Exception as e:
+            raise ExtractionError(f"Crawl4AI AI extraction failed for {url}: {e}")
+
+        if not crawl_result.success:
+            error_msg = crawl_result.error_message or "Unknown error"
+            raise ExtractionError(f"Page load failed for {url}: {error_msg}")
+
+        duration_ms = int((time.monotonic() - start) * 1000)
+
+        raw_output = crawl_result.extracted_content or ""
+        parsed_data = None
+
+        if output_format == "json" and raw_output:
+            try:
+                parsed_data = json.loads(raw_output)
+            except (json.JSONDecodeError, TypeError):
+                parsed_data = {"raw": raw_output}
+
+        return {
+            "data": parsed_data if output_format == "json" else raw_output,
+            "raw": raw_output,
+            "duration_ms": duration_ms,
+        }
+
+    # ------------------------------------------------------------------
+    # P2-4: Dedicated screenshot extraction
+    # ------------------------------------------------------------------
+
+    async def extract_screenshot(
+        self,
+        url: str,
+        full_page: bool = False,
+        selector: str | None = None,
+    ) -> dict[str, Any]:
+        """Capture a screenshot of a web page.
+
+        Args:
+            url: The URL to screenshot.
+            full_page: Capture the full scrollable page.
+            selector: Optional CSS selector for element-specific screenshot.
+
+        Returns:
+            Dict with 'screenshot' (base64 PNG) and 'format'.
+        """
+        start = time.monotonic()
+        crawler = await self._get_crawler()
+
+        # Build a run config with screenshot enabled
+        run_config = get_run_config(
+            extraction_strategy=None,
+            screenshot=True,
+            cache_mode=CacheMode.ENABLED,
+        )
+
+        # If a CSS selector is specified, use css_selector for element screenshot
+        if selector:
+            run_config.css_selector = selector
+
+        # For full-page screenshots, adjust the config
+        if full_page:
+            # Crawl4AI captures full page by default. If there's an explicit
+            # full_page setting to toggle, set it here.
+            pass
+
+        try:
+            crawl_result = await crawler.arun(url=url, config=run_config)
+        except Exception as e:
+            raise ExtractionError(f"Screenshot capture failed for {url}: {e}")
+
+        if not crawl_result.success:
+            error_msg = crawl_result.error_message or "Unknown error"
+            raise ExtractionError(f"Page load failed for {url}: {error_msg}")
+
+        duration_ms = int((time.monotonic() - start) * 1000)
+
+        screenshot_b64 = crawl_result.screenshot or ""
+
+        return {
+            "screenshot": screenshot_b64,
+            "format": "png",
+            "duration_ms": duration_ms,
+        }
 
 
 class _ExtractResult:

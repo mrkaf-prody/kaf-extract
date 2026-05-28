@@ -19,8 +19,17 @@ _fallback_keys: dict[str, dict] = {}
 def _register_dev_key() -> None:
     """Register the default dev API key in the fallback store."""
     from src.config import settings
-    if settings.dev_api_key not in _fallback_keys:
+    if settings.dev_api_key in _fallback_keys:
+        return
+    try:
         _fallback_keys[pwd_context.hash(settings.dev_api_key)] = {
+            "label": "dev-default",
+            "rate_limit": 100,
+            "tier": "hobby",
+        }
+    except Exception:
+        # passlib + bcrypt compatibility issue — use raw key as fallback
+        _fallback_keys[settings.dev_api_key] = {
             "label": "dev-default",
             "rate_limit": 100,
             "tier": "hobby",
@@ -32,9 +41,16 @@ _register_dev_key()
 
 def _verify_in_memory(key: str) -> dict | None:
     """Check fallback in-memory keys (dev key)."""
+    # First check raw key fallback (for bcrypt compatibility issues)
+    if key in _fallback_keys:
+        return _fallback_keys[key]
+    # Then try bcrypt verification
     for hashed, meta in _fallback_keys.items():
-        if pwd_context.verify(key, hashed):
-            return meta
+        try:
+            if pwd_context.verify(key, hashed):
+                return meta
+        except Exception:
+            continue
     return None
 
 

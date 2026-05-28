@@ -22,7 +22,15 @@ export const AdminLayout: React.FC = () => {
   const { user, logout } = useAuth();
 
   if (!user || user.role !== 'admin') {
-    return <div className="flex items-center justify-center h-screen text-red-400">Access Denied — Admin only</div>;
+    return (
+      <div className="flex flex-col items-center justify-center h-screen text-slate-400 bg-slate-950 gap-4">
+        <Shield size={48} className="text-slate-600" />
+        <p className="text-lg">Access Denied — Admin only</p>
+        <a href="/dashboard" className="text-blue-400 hover:text-blue-300 text-sm">
+          Go to Dashboard
+        </a>
+      </div>
+    );
   }
 
   return (
