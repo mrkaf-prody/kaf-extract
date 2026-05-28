@@ -165,17 +165,34 @@
 
 ---
 
-## Phase 5: Scale & Polish (Ongoing)
+## Phase 5: Revenue-Ready Features (COMPLETE ✅)
+
+| Ticket | Description | Effort | Status |
+|--------|-------------|--------|:------:|
+| **P5-1** | API docs + SDKs (Python async, JS/TS zero-dep, cURL examples, dev portal) | 4h | ✅ Complete |
+| **P5-2** | Scheduled extractions (cron via croniter, arq enqueue, webhook on completion) | 4h | ✅ Complete |
+| **P5-3** | Exports & integrations (Slack Block Kit, history API, Google Sheets pipeline) | 3h | ✅ Complete |
+| **P5-4** | Team accounts (orgs, owner/admin/member/viewer roles, per-member usage) | 5h | ✅ Complete |
+| **P5-5** | Usage alerts + quotas (80/90/100% thresholds, Resend email, hard caps) | 3h | ✅ Complete |
+
+### Tier 3 (Deferred — activate at 50+ paying users)
 
 | Ticket | Description | Effort |
 |--------|-------------|--------|
-| **P5-1** | Proxy rotation pool (residential + datacenter) | 5h |
-| **P5-2** | Anti-bot detection bypass | 4h |
-| **P5-3** | Scheduled extractions (cron via RQ scheduler) | 3h |
-| **P5-4** | Team accounts (shared keys, roles, member limits) | 4h |
-| **P5-5** | Public API client libraries (Python, JS, cURL) | 3h |
-| **P5-6** | Firecrawl Cloud fallback (when anti-bot needed) | 4h |
-| **P5-7** | White-label option (custom domain, branding) | 6h |
+| P6-1 | Proxy rotation pool (residential + datacenter) | 5h |
+| P6-2 | Anti-bot detection bypass | 4h |
+| P6-3 | Firecrawl Cloud fallback (when anti-bot needed) | 4h |
+| P6-4 | White-label option (custom domain, branding) | 6h |
+
+### Phase 5 Stats
+
+| Metric | Value |
+|--------|:-----:|
+| API endpoints deployed | 43 |
+| Database migrations | 005 |
+| SDKs shipped | Python (httpx) + JS/TS (fetch) |
+| Admin panels | 2 (Dashboard + Dev Portal) |
+| Deployed at | extract.kafcenter.com + ai.kafcenter.com |
 
 ---
 
