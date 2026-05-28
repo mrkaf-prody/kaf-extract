@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kaf Extract — API Docs</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #14141f;
+    --border: #252535;
+    --text: #e4e4ec;
+    --muted: #8888a0;
+    --accent: #7c3aed;
+    --accent-glow: #a78bfa;
+    --green: #10b981;
+    --orange: #f59e0b;
+    --red: #ef4444;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+  /* Hero */
+  .hero {
+    background: linear-gradient(135deg, #0a0a1a 0%, #1a1030 50%, #0a0a1a 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 80px 0 60px;
+    text-align: center;
+  }
+  .hero h1 { font-size: 3rem; font-weight: 800; letter-spacing: -1px; margin-bottom: 12px; }
+  .hero h1 span { background: linear-gradient(135deg, var(--accent), var(--accent-glow)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .hero p { font-size: 1.2rem; color: var(--muted); max-width: 600px; margin: 0 auto 32px; }
+  .hero-badges { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--accent-glow); padding: 8px 16px; border-radius: 8px;
+    font-size: 0.875rem; font-weight: 500; text-decoration: none;
+  }
+  .badge:hover { border-color: var(--accent); background: #1a1a2e; }
+  .badge.green { color: var(--green); }
+
+  /* Content */
+  .content { padding: 60px 0; }
+  section { margin-bottom: 64px; }
+  h2 {
+    font-size: 1.75rem; font-weight: 700; margin-bottom: 16px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  }
+  h3 { font-size: 1.2rem; font-weight: 600; margin: 32px 0 12px; color: var(--accent-glow); }
+
+  /* Code blocks */
+  pre {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px 24px; overflow-x: auto;
+    margin: 16px 0; font-size: 0.875rem; line-height: 1.6;
+    position: relative;
+  }
+  code { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+  .lang-tag {
+    position: absolute; top: 10px; right: 16px;
+    font-size: 0.7rem; color: var(--muted); text-transform: uppercase;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  /* Endpoint cards */
+  .endpoint-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin: 24px 0; }
+  .endpoint-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px; transition: border-color 0.2s;
+  }
+  .endpoint-card:hover { border-color: var(--accent); }
+  .method {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    margin-right: 8px;
+  }
+  .method.post { background: rgba(16,185,129,0.15); color: var(--green); }
+  .method.get { background: rgba(124,58,237,0.15); color: var(--accent-glow); }
+  .method.put { background: rgba(245,158,11,0.15); color: var(--orange); }
+  .endpoint-path { font-family: monospace; font-size: 0.9rem; }
+  .endpoint-desc { color: var(--muted); font-size: 0.85rem; margin-top: 6px; }
+
+  /* Auth note */
+  .callout {
+    background: rgba(124,58,237,0.08); border: 1px solid rgba(124,58,237,0.3);
+    border-radius: 10px; padding: 16px 20px; margin: 24px 0;
+  }
+  .callout strong { color: var(--accent-glow); }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .hero h1 { font-size: 2rem; }
+    .endpoint-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="container">
+    <h1>Kaf <span>Extract</span> API</h1>
+    <p>AI-powered web data extraction. CSS selectors, AI extraction, screenshots, batch processing — all through a single API.</p>
+    <div class="hero-badges">
+      <a href="#quickstart" class="badge">⚡ Quick Start</a>
+      <a href="#endpoints" class="badge">📡 API Reference</a>
+      <a href="#sdks" class="badge">📦 SDKs</a>
+      <span class="badge green">🟢 v0.2.0 — Production</span>
+    </div>
+  </div>
+</div>
+
+<div class="content container">
+
+<!-- Quick Start -->
+<section id="quickstart">
+  <h2>Quick Start</h2>
+
+  <h3>Python</h3>
+  <pre><span class="lang-tag">bash</span><code>pip install kaf-extract</code></pre>
+  <pre><span class="lang-tag">python</span><code>from kaf_extract import KafExtract
+
+client = KafExtract(api_key="kaf_your_key")
+result = client.extract_sync("https://books.toscrape.com", fields=[
+    {"name": "title", "selector": "h1", "type": "text"},
+    {"name": "price", "selector": ".price_color", "type": "text"},
+])
+print(result.data["title"])  # "A Light in the Attic"</code></pre>
+
+  <h3>JavaScript / TypeScript</h3>
+  <pre><span class="lang-tag">bash</span><code>npm install kaf-extract</code></pre>
+  <pre><span class="lang-tag">typescript</span><code>import { KafExtract } from "kaf-extract";
+
+const client = new KafExtract({ apiKey: "kaf_your_key" });
+const result = await client.extract("https://books.toscrape.com", {
+  fields: [
+    { name: "title", selector: "h1", type: "text" },
+    { name: "price", selector: ".price_color", type: "text" },
+  ],
+});
+console.log(result.data?.title);</code></pre>
+
+  <h3>cURL</h3>
+  <pre><span class="lang-tag">bash</span><code>curl -X POST https://extract.kafcenter.com/api/v1/extract \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: kaf_your_api_key" \
+  -d '{
+    "url": "https://books.toscrape.com",
+    "schema": {
+      "fields": [
+        {"name": "title", "selector": "h1", "type": "text"},
+        {"name": "price", "selector": ".price_color", "type": "text"}
+      ]
+    }
+  }'</code></pre>
+</section>
+
+<!-- SDKs -->
+<section id="sdks">
+  <h2>SDKs</h2>
+  <div class="endpoint-grid">
+    <div class="endpoint-card">
+      <strong>🐍 Python</strong>
+      <p class="endpoint-desc"><code>pip install kaf-extract</code><br>Async/await, full type hints, httpx-based.</p>
+      <a href="https://pypi.org/project/kaf-extract/" style="color:var(--accent-glow);font-size:0.85rem;">PyPI →</a>
+    </div>
+    <div class="endpoint-card">
+      <strong>📦 JavaScript / TypeScript</strong>
+      <p class="endpoint-desc"><code>npm install kaf-extract</code><br>ESM + CJS, full TypeScript declarations, fetch-based.</p>
+      <a href="https://www.npmjs.com/package/kaf-extract" style="color:var(--accent-glow);font-size:0.85rem;">npm →</a>
+    </div>
+    <div class="endpoint-card">
+      <strong>🖥️ cURL</strong>
+      <p class="endpoint-desc">Zero-dependency. Works everywhere.</p>
+      <a href="#endpoints" style="color:var(--accent-glow);font-size:0.85rem;">Examples below →</a>
+    </div>
+  </div>
+</section>
+
+<!-- API Reference -->
+<section id="endpoints">
+  <h2>API Reference</h2>
+
+  <div class="callout">
+    <strong>Base URL:</strong> <code>https://extract.kafcenter.com</code><br>
+    <strong>Auth:</strong> <code>X-API-Key</code> header for extraction endpoints. <code>Authorization: Bearer &lt;JWT&gt;</code> for user endpoints.
+  </div>
+
+  <h3>Extraction</h3>
+  <div class="endpoint-grid">
+    <div class="endpoint-card">
+      <span class="method post">POST</span><span class="endpoint-path">/api/v1/extract</span>
+      <p class="endpoint-desc">Extract structured data from a URL. Supports text, html, attribute, exists, markdown, screenshot, and ai types. Redis-cached with 5-min TTL. Use ?async=true for async jobs.</p>
+    </div>
+    <div class="endpoint-card">
+      <span class="method post">POST</span><span class="endpoint-path">/api/v1/extract/ai</span>
+      <p class="endpoint-desc">AI-powered extraction — no selectors needed. Uses Ollama (kimi-k2.6 or glm-5.1).</p>
+    </div>
+    <div class="endpoint-card">
+      <span class="method post">POST</span><span class="endpoint-path">/api/v1/extract/batch</span>
+      <p class="endpoint-desc">Extract from up to 50 URLs in parallel. Same schema applied to all.</p>
+    </div>
+    <div class="endpoint-card">
+      <span class="method get">GET</span><span class="endpoint-path">/api/v1/extract/{job_id}</span>
+      <p class="endpoint-desc">Poll for async extraction job results.</p>
+    </div>
+    <div class="endpoint-card">
+      <span class="method post">POST</span><span class="endpoint-path">/api/v1/extract/screenshot</span>
+      <p class="endpoint-desc">Capture screenshots — full page, viewport, or specific element.</p>
+    </div>
+  </div>
+
+  <h3>Auth</h3>
+  <div class="endpoint-grid">
+    <div class="endpoint-card">
+      <span class="method post">POST</span><span class="endpoint-path">/auth/register</span>
+      <p class="endpoint-desc">Create an account. Returns JWT access + refresh tokens.</p>
+    </div>
+    <div class="endpoint-card">
+      <span class="method post">POST</span><span class="endpoint-path">/auth/login</span>
+      <p class="endpoint-desc">Login with email + password. Returns JWT tokens.</p>
+    </div>
+    <div class="endpoint-card">
+      <span class="method post">POST</span><span class="endpoint-path">/auth/refresh</span>
+      <p class="endpoint-desc">Exchange refresh token for new token pair.</p>
+    </div>
+    <div class="endpoint-card">
+      <span class="method get">GET</span><span class="endpoint-path">/auth/me</span>
+      <p class="endpoint-desc">Get current user profile.</p>
+    </div>
+    <div class="endpoint-card">
+      <span class="method put">PUT</span><span class="endpoint-path">/auth/me/password</span>
+      <p class="endpoint-desc">Change password.</p>
+    </div>
+  </div>
+
+  <h3>Vouchers</h3>
+  <div class="endpoint-grid">
+    <div class="endpoint-card">
+      <span class="method post">POST</span><span class="endpoint-path">/api/v1/vouchers/redeem</span>
+      <p class="endpoint-desc">Redeem a voucher code for credits/subscription.</p>
+    </div>
+    <div class="endpoint-card">
+      <span class="method get">GET</span><span class="endpoint-path">/api/v1/vouchers/history</span>
+      <p class="endpoint-desc">View your redemption history.</p>
+    </div>
+  </div>
+
+  <h3>System</h3>
+  <div class="endpoint-grid">
+    <div class="endpoint-card">
+      <span class="method get">GET</span><span class="endpoint-path">/health</span>
+      <p class="endpoint-desc">Health check: API, database, Redis status. No auth required.</p>
+    </div>
+    <div class="endpoint-card">
+      <span class="method get">GET</span><span class="endpoint-path">/metrics</span>
+      <p class="endpoint-desc">Usage metrics: requests, cache hits, latency, error rate.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Extraction Types -->
+<section id="types">
+  <h2>Extraction Types</h2>
+  <div class="endpoint-grid">
+    <div class="endpoint-card">
+      <strong>text</strong>
+      <p class="endpoint-desc">Inner text of the matched element.</p>
+    </div>
+    <div class="endpoint-card">
+      <strong>html</strong>
+      <p class="endpoint-desc">Inner HTML of the matched element.</p>
+    </div>
+    <div class="endpoint-card">
+      <strong>attribute</strong>
+      <p class="endpoint-desc">Value of a specific HTML attribute (e.g., src, href).</p>
+    </div>
+    <div class="endpoint-card">
+      <strong>exists</strong>
+      <p class="endpoint-desc">Boolean: true if the selector matches anything.</p>
+    </div>
+    <div class="endpoint-card">
+      <strong>markdown</strong>
+      <p class="endpoint-desc">Full page content as clean Markdown.</p>
+    </div>
+    <div class="endpoint-card">
+      <strong>screenshot</strong>
+      <p class="endpoint-desc">Base64-encoded PNG screenshot of the matched element.</p>
+    </div>
+    <div class="endpoint-card">
+      <strong>ai</strong>
+      <p class="endpoint-desc">LLM-powered extraction via Ollama. No selectors needed.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Rate Limits -->
+<section id="rate-limits">
+  <h2>Rate Limits</h2>
+  <p>All extraction endpoints enforce per-API-key sliding window rate limits. Exceeding the limit returns <strong>HTTP 429</strong>.</p>
+  <table style="width:100%;border-collapse:collapse;margin-top:16px;">
+    <thead>
+      <tr style="text-align:left;border-bottom:1px solid var(--border);">
+        <th style="padding:8px 12px;color:var(--muted);font-weight:600;">Header</th>
+        <th style="padding:8px 12px;color:var(--muted);font-weight:600;">Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 12px;font-family:monospace;font-size:0.875rem;">X-RateLimit-Limit</td><td style="padding:8px 12px;">Max requests per window</td></tr>
+      <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 12px;font-family:monospace;font-size:0.875rem;">X-RateLimit-Remaining</td><td style="padding:8px 12px;">Requests remaining in current window</td></tr>
+      <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 12px;font-family:monospace;font-size:0.875rem;">X-RateLimit-Reset</td><td style="padding:8px 12px;">Unix timestamp when the window resets</td></tr>
+      <tr><td style="padding:8px 12px;font-family:monospace;font-size:0.875rem;">Retry-After</td><td style="padding:8px 12px;">Seconds until you can retry (only on 429)</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- Pricing -->
+<section id="pricing">
+  <h2>Pricing</h2>
+  <div class="endpoint-grid">
+    <div class="endpoint-card">
+      <strong>🆓 Free Trial</strong>
+      <p class="endpoint-desc">$0 — 7 days, 100 extractions, 10/min. CSS extraction only. No credit card.</p>
+    </div>
+    <div class="endpoint-card">
+      <strong>🏠 Hobby</strong>
+      <p class="endpoint-desc">$19/mo — 5,000 extractions, 60/min. CSS + Markdown + Screenshots.</p>
+    </div>
+    <div class="endpoint-card">
+      <strong>🚀 Pro</strong>
+      <p class="endpoint-desc">$99/mo — 50,000 extractions, 300/min. + AI extraction, batch, webhooks.</p>
+    </div>
+    <div class="endpoint-card">
+      <strong>🏢 Enterprise</strong>
+      <p class="endpoint-desc">Custom — proxy rotation, anti-bot bypass, SLA, white-label. Contact us.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer style="text-align:center;padding:40px 0;color:var(--muted);font-size:0.85rem;border-top:1px solid var(--border);margin-top:60px;">
+  <strong>Kaf Center</strong> — Built with Crawl4AI, PostgreSQL, Redis, and ❤️<br>
+  <a href="https://extract.kafcenter.com" style="color:var(--accent-glow);">extract.kafcenter.com</a> ·
+  <a href="https://github.com/mrkaf-prody/kaf-extract" style="color:var(--accent-glow);">GitHub</a>
+</footer>
+
+</div>
+</body>
+</html>
