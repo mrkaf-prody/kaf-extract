@@ -135,7 +135,7 @@ async def _get_org(db: AsyncSession, org_id: str, user_id: str) -> Organization:
         await db.execute(
             select(OrganizationMember).where(
                 OrganizationMember.org_id == org.id,
-                OrganizationMember.user_id == _uuid.UUID(user_id),
+                OrganizationMember.user_id == (_uuid.UUID(user_id) if isinstance(user_id, str) else user_id),
             )
         )
     ).scalar_one_or_none()
@@ -192,7 +192,7 @@ async def create_organization(
             detail=f"Slug '{body.slug}' is already taken. Choose another.",
         )
 
-    user_id = current_user["user_id"]
+    user_id = str(current_user["user_id"])
     org_id = _uuid.uuid4()
 
     org = Organization(
@@ -223,7 +223,7 @@ async def list_organizations(
     db: AsyncSession = Depends(get_db),
 ):
     """List all organizations the current user belongs to."""
-    user_id = current_user["user_id"]
+    user_id = str(current_user["user_id"])
 
     # Find all orgs where user is a member
     member_rows = (
@@ -274,7 +274,7 @@ async def get_organization(
     db: AsyncSession = Depends(get_db),
 ):
     """Get organization details."""
-    org, member = await _get_org(db, org_id, current_user["user_id"])
+    org, member = await _get_org(db, org_id, str(current_user["user_id"]))
 
     # Count members
     count = (
@@ -296,7 +296,7 @@ async def update_organization(
     db: AsyncSession = Depends(get_db),
 ):
     """Update organization settings. Admin or owner only."""
-    org, member = await _get_org(db, org_id, current_user["user_id"])
+    org, member = await _get_org(db, org_id, str(current_user["user_id"]))
     await _require_admin(member)
 
     if body.name is not None:
@@ -326,7 +326,7 @@ async def delete_organization(
     db: AsyncSession = Depends(get_db),
 ):
     """Delete an organization. Owner only."""
-    org, member = await _get_org(db, org_id, current_user["user_id"])
+    org, member = await _get_org(db, org_id, str(current_user["user_id"]))
     await _require_owner(member)
 
     await db.delete(org)
@@ -342,7 +342,7 @@ async def list_members(
     db: AsyncSession = Depends(get_db),
 ):
     """List all members of an organization."""
-    org, member = await _get_org(db, org_id, current_user["user_id"])
+    org, member = await _get_org(db, org_id, str(current_user["user_id"]))
 
     rows = (
         await db.execute(
@@ -367,7 +367,7 @@ async def invite_member(
     db: AsyncSession = Depends(get_db),
 ):
     """Invite a user to the organization by email. Admin or owner only."""
-    org, member = await _get_org(db, org_id, current_user["user_id"])
+    org, member = await _get_org(db, org_id, str(current_user["user_id"]))
     await _require_admin(member)
 
     # Find user by email
@@ -420,7 +420,7 @@ async def change_member_role(
     db: AsyncSession = Depends(get_db),
 ):
     """Change a member's role. Admin or owner only."""
-    org, actor = await _get_org(db, org_id, current_user["user_id"])
+    org, actor = await _get_org(db, org_id, str(current_user["user_id"]))
     await _require_admin(actor)
 
     # Can't change owner role
@@ -428,7 +428,7 @@ async def change_member_role(
         await db.execute(
             select(OrganizationMember).where(
                 OrganizationMember.org_id == org.id,
-                OrganizationMember.user_id == _uuid.UUID(user_id),
+                OrganizationMember.user_id == (_uuid.UUID(user_id) if isinstance(user_id, str) else user_id),
             )
         )
     ).scalar_one_or_none()
@@ -462,14 +462,14 @@ async def remove_member(
     db: AsyncSession = Depends(get_db),
 ):
     """Remove a member from the organization. Admin or owner only."""
-    org, actor = await _get_org(db, org_id, current_user["user_id"])
+    org, actor = await _get_org(db, org_id, str(current_user["user_id"]))
     await _require_admin(actor)
 
     target = (
         await db.execute(
             select(OrganizationMember).where(
                 OrganizationMember.org_id == org.id,
-                OrganizationMember.user_id == _uuid.UUID(user_id),
+                OrganizationMember.user_id == (_uuid.UUID(user_id) if isinstance(user_id, str) else user_id),
             )
         )
     ).scalar_one_or_none()
@@ -481,7 +481,7 @@ async def remove_member(
         raise HTTPException(status_code=403, detail="Cannot remove the organization owner")
 
     # Can't remove yourself unless owner (and there must be another owner)
-    if str(target.user_id) == current_user["user_id"] and actor.role != "owner":
+    if str(target.user_id) == str(current_user["user_id"]) and actor.role != "owner":
         raise HTTPException(status_code=403, detail="Cannot remove yourself")
 
     await db.delete(target)
@@ -497,7 +497,7 @@ async def org_usage(
     db: AsyncSession = Depends(get_db),
 ):
     """Get extraction usage per member in the organization."""
-    org, member = await _get_org(db, org_id, current_user["user_id"])
+    org, member = await _get_org(db, org_id, str(current_user["user_id"]))
 
     rows = (
         await db.execute(
