@@ -59,9 +59,11 @@ class Settings(BaseSettings):
 
     # --- Paddle ---
     paddle_api_key: str = ""
+    paddle_webhook_secret: str = ""
     paddle_test_mode: bool = True
-    paddle_product_pro: str = ""
-    paddle_product_enterprise: str = ""
+    paddle_price_hobby: str = ""
+    paddle_price_pro: str = ""
+    paddle_price_enterprise: str = ""
 
     # --- Manual (voucher-based) ---
     manual_trial_extractions: int = 100
