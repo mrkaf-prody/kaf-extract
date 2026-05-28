@@ -161,6 +161,13 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     db.add(user)
     await db.flush()
 
+    # Auto-start trial for new users
+    try:
+        from src.services.trials import start_trial
+        await start_trial(db, user.id)
+    except Exception:
+        pass  # Non-fatal — user can still use the service
+
     # Generate tokens
     access_token = create_access_token(str(user.id), user.email, user.role)
     refresh_token = create_refresh_token(str(user.id))

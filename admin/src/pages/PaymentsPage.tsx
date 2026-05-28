@@ -10,14 +10,16 @@ import {
 
 type Provider = 'lemonsqueezy' | 'paddle' | 'stripe' | 'manual';
 
+interface ProviderInfo {
+  api_key: string;
+  webhook_secret: string;
+  enabled: boolean;
+}
+
 interface PaymentConfig {
-  active_provider: Provider;
+  active_provider: string;
   test_mode: boolean;
-  providers: Record<Provider, {
-    api_key: string;       // masked when returned from API
-    webhook_secret: string; // masked
-    enabled: boolean;
-  }>;
+  providers: Record<string, ProviderInfo>;
 }
 
 interface Transaction {
@@ -31,49 +33,25 @@ interface Transaction {
   description: string;
 }
 
-// ─── Mock data ───
-
-const MOCK_CONFIG: PaymentConfig = {
-  active_provider: 'stripe',
-  test_mode: false,
-  providers: {
-    lemonsqueezy: { api_key: 'lsk_live_•••••••••••••••••••••a1b2', webhook_secret: 'whsec_•••••••••••••••••••••x9y0', enabled: true },
-    paddle:       { api_key: 'pdl_live_•••••••••••••••••••••c3d4', webhook_secret: 'whsec_•••••••••••••••••••••z8w7', enabled: false },
-    stripe:       { api_key: 'sk_live_••••••••••••••••••••••e5f6', webhook_secret: 'whsec_•••••••••••••••••••••v6u5', enabled: true },
-    manual:       { api_key: '', webhook_secret: '', enabled: true },
-  },
-};
-
-const MOCK_TRANSACTIONS: Transaction[] = [
-  { id: 'txn_001', date: '2026-05-28T10:32:00Z', user_email: 'alice@example.com', amount: 29.99, currency: 'USD', provider: 'stripe', status: 'completed', description: 'Pro Monthly' },
-  { id: 'txn_002', date: '2026-05-28T09:15:00Z', user_email: 'bob@acme.com', amount: 299.00, currency: 'USD', provider: 'stripe', status: 'completed', description: 'Enterprise Annual' },
-  { id: 'txn_003', date: '2026-05-28T08:45:00Z', user_email: 'carol@demo.io', amount: 9.99, currency: 'USD', provider: 'lemonsqueezy', status: 'pending', description: 'Starter Monthly' },
-  { id: 'txn_004', date: '2026-05-27T16:20:00Z', user_email: 'dave@test.com', amount: 49.99, currency: 'EUR', provider: 'stripe', status: 'failed', description: 'Plus Monthly' },
-  { id: 'txn_005', date: '2026-05-27T14:10:00Z', user_email: 'eve@corp.net', amount: 29.99, currency: 'USD', provider: 'stripe', status: 'refunded', description: 'Pro Monthly' },
-  { id: 'txn_006', date: '2026-05-27T11:05:00Z', user_email: 'frank@startup.io', amount: 149.00, currency: 'USD', provider: 'paddle', status: 'completed', description: 'Business Annual' },
-  { id: 'txn_007', date: '2026-05-26T22:30:00Z', user_email: 'grace@enterprise.co', amount: 299.00, currency: 'USD', provider: 'stripe', status: 'completed', description: 'Enterprise Annual' },
-  { id: 'txn_008', date: '2026-05-26T18:00:00Z', user_email: 'henry@freelance.dev', amount: 9.99, currency: 'GBP', provider: 'manual', status: 'completed', description: 'Starter Monthly' },
-  { id: 'txn_009', date: '2026-05-26T15:45:00Z', user_email: 'iris@agency.com', amount: 49.99, currency: 'USD', provider: 'stripe', status: 'pending', description: 'Plus Monthly' },
-  { id: 'txn_010', date: '2026-05-26T09:00:00Z', user_email: 'jack@devshop.io', amount: 29.99, currency: 'USD', provider: 'lemonsqueezy', status: 'failed', description: 'Pro Monthly' },
-];
-
 // ─── Helpers ───
 
-const providerLabel = (p: Provider): string => {
+const providerLabel = (p: string): string => {
   switch (p) {
     case 'lemonsqueezy': return 'Lemon Squeezy';
     case 'paddle': return 'Paddle';
     case 'stripe': return 'Stripe';
     case 'manual': return 'Manual';
+    default: return p;
   }
 };
 
-const providerIconColor = (p: Provider): string => {
+const providerIconColor = (p: string): string => {
   switch (p) {
     case 'lemonsqueezy': return 'text-yellow-400';
     case 'paddle': return 'text-cyan-400';
     case 'stripe': return 'text-indigo-400';
     case 'manual': return 'text-slate-400';
+    default: return 'text-slate-400';
   }
 };
 
@@ -118,6 +96,29 @@ const SkeletonBlock = ({ lines = 3 }: { lines?: number }) => (
   </div>
 );
 
+// ─── Toast ───
+
+const Toast: React.FC<{ message: string; type: 'success' | 'error'; onClose: () => void }> = ({ message, type, onClose }) => {
+  useEffect(() => {
+    const t = setTimeout(onClose, 4000);
+    return () => clearTimeout(t);
+  }, [onClose]);
+
+  return (
+    <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border ${
+      type === 'success'
+        ? 'bg-emerald-900/90 border-emerald-700 text-emerald-200'
+        : 'bg-red-900/90 border-red-700 text-red-200'
+    }`}>
+      {type === 'success' ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
+      <span className="text-sm">{message}</span>
+      <button onClick={onClose} className="ml-2 text-current opacity-60 hover:opacity-100">
+        <XCircle size={14} />
+      </button>
+    </div>
+  );
+};
+
 // ─── Page ───
 
 export const PaymentsPage: React.FC = () => {
@@ -131,15 +132,15 @@ export const PaymentsPage: React.FC = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Editable fields
-  const [activeProvider, setActiveProvider] = useState<Provider>('stripe');
+  const [activeProvider, setActiveProvider] = useState<string>('manual');
   const [testMode, setTestMode] = useState(false);
-  const [apiKeys, setApiKeys] = useState<Record<Provider, string>>({
+  const [apiKeys, setApiKeys] = useState<Record<string, string>>({
     lemonsqueezy: '', paddle: '', stripe: '', manual: '',
   });
-  const [webhookSecrets, setWebhookSecrets] = useState<Record<Provider, string>>({
+  const [webhookSecrets, setWebhookSecrets] = useState<Record<string, string>>({
     lemonsqueezy: '', paddle: '', stripe: '', manual: '',
   });
-  const [showKey, setShowKey] = useState<Record<Provider, boolean>>({
+  const [showKey, setShowKey] = useState<Record<string, boolean>>({
     lemonsqueezy: false, paddle: false, stripe: false, manual: false,
   });
 
@@ -148,39 +149,37 @@ export const PaymentsPage: React.FC = () => {
   const [txLoading, setTxLoading] = useState(true);
   const [txError, setTxError] = useState<string | null>(null);
 
-  // Load config
+  // Toast
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // ─── Load config ───
   const loadConfig = useCallback(async () => {
     try {
-      // TODO: Replace with real API: const data = await apiFetch('/v1/admin/payments');
-      const data = { ...MOCK_CONFIG };
+      const data: PaymentConfig = await apiFetch('/v1/admin/payments');
       setConfig(data);
       setActiveProvider(data.active_provider);
       setTestMode(data.test_mode);
-      setApiKeys({
-        lemonsqueezy: data.providers.lemonsqueezy.api_key,
-        paddle: data.providers.paddle.api_key,
-        stripe: data.providers.stripe.api_key,
-        manual: data.providers.manual.api_key,
-      });
-      setWebhookSecrets({
-        lemonsqueezy: data.providers.lemonsqueezy.webhook_secret,
-        paddle: data.providers.paddle.webhook_secret,
-        stripe: data.providers.stripe.webhook_secret,
-        manual: data.providers.manual.webhook_secret,
-      });
+      const keys: Record<string, string> = {};
+      const secrets: Record<string, string> = {};
+      for (const [p, info] of Object.entries(data.providers)) {
+        keys[p] = info.api_key || '';
+        secrets[p] = info.webhook_secret || '';
+      }
+      setApiKeys(keys);
+      setWebhookSecrets(secrets);
       setConfigError(null);
     } catch (err: any) {
       setConfigError(err.message || 'Failed to load payment config');
     } finally {
       setConfigLoading(false);
     }
-  }, []);
+  }, [apiFetch]);
 
-  // Load transactions
+  // ─── Load transactions (placeholder — no dedicated endpoint yet) ───
   const loadTransactions = useCallback(async () => {
     try {
-      // TODO: Replace with real API: const data = await apiFetch('/v1/admin/payments/transactions');
-      setTransactions(MOCK_TRANSACTIONS);
+      // No transactions endpoint yet — keep empty for now
+      setTransactions([]);
       setTxError(null);
     } catch (err: any) {
       setTxError(err.message || 'Failed to load transactions');
@@ -194,29 +193,39 @@ export const PaymentsPage: React.FC = () => {
     loadTransactions();
   }, [loadConfig, loadTransactions]);
 
-  // Save handler
+  // ─── Save handler ───
   const handleSave = async () => {
     setSaving(true);
     setSaveSuccess(false);
+    setConfigError(null);
     try {
-      const payload = {
+      const payload: any = {
         active_provider: activeProvider,
         test_mode: testMode,
-        providers: Object.fromEntries(
-          (Object.keys(apiKeys) as Provider[]).map((p) => [p, {
-            api_key: apiKeys[p],
-            webhook_secret: webhookSecrets[p],
-            enabled: config?.providers[p].enabled ?? true,
-          }])
-        ),
       };
-      // TODO: Replace with real API: await apiFetch('/v1/admin/payments', { method: 'PATCH', body: JSON.stringify(payload) });
-      // Simulate save delay
-      await new Promise((r) => setTimeout(r, 600));
+      // Only send providers if they have values
+      const providers: Record<string, { api_key: string; webhook_secret: string; enabled: boolean }> = {};
+      for (const p of ['lemonsqueezy', 'paddle', 'stripe', 'manual'] as const) {
+        providers[p] = {
+          api_key: apiKeys[p] || '',
+          webhook_secret: webhookSecrets[p] || '',
+          enabled: config?.providers?.[p]?.enabled ?? true,
+        };
+      }
+      payload.providers = providers;
+
+      await apiFetch('/v1/admin/payments', {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
       setSaveSuccess(true);
+      setToast({ message: 'Payment configuration saved', type: 'success' });
       setTimeout(() => setSaveSuccess(false), 2500);
+      // Reload config to get masked values
+      await loadConfig();
     } catch (err: any) {
       setConfigError(err.message || 'Failed to save config');
+      setToast({ message: err.message || 'Save failed', type: 'error' });
     } finally {
       setSaving(false);
     }
@@ -237,6 +246,8 @@ export const PaymentsPage: React.FC = () => {
       </div>
     );
   }
+
+  const providers = config?.providers || {};
 
   return (
     <div className="space-y-6">
@@ -286,7 +297,7 @@ export const PaymentsPage: React.FC = () => {
                         {providerLabel(provider)}
                       </p>
                       <p className="text-xs text-slate-600">
-                        {config?.providers[provider].enabled ? 'Enabled' : 'Disabled'}
+                        {providers[provider]?.enabled ? 'Enabled' : 'Disabled'}
                       </p>
                     </div>
                     {/* Active dot */}
@@ -305,7 +316,7 @@ export const PaymentsPage: React.FC = () => {
                   <div className="flex items-center gap-2 mb-3">
                     <CreditCard size={14} className={providerIconColor(provider)} />
                     <span className="text-sm font-medium text-slate-300">{providerLabel(provider)}</span>
-                    {!config?.providers[provider].enabled && (
+                    {!providers[provider]?.enabled && (
                       <span className="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-500">Disabled</span>
                     )}
                   </div>
@@ -316,21 +327,21 @@ export const PaymentsPage: React.FC = () => {
                       <div className="relative">
                         <input
                           type={showKey[provider] ? 'text' : 'password'}
-                          value={apiKeys[provider]}
+                          value={apiKeys[provider] || ''}
                           onChange={(e) => setApiKeys((prev) => ({ ...prev, [provider]: e.target.value }))}
                           placeholder={
-                            config?.providers[provider].enabled
+                            providers[provider]?.enabled
                               ? `Enter ${providerLabel(provider)} API key...`
                               : 'Provider disabled'
                           }
-                          disabled={!config?.providers[provider].enabled}
+                          disabled={!providers[provider]?.enabled}
                           className="w-full pl-3 pr-10 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-600 font-mono focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         />
                         <button
                           type="button"
                           onClick={() => setShowKey((prev) => ({ ...prev, [provider]: !prev[provider] }))}
                           className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
-                          disabled={!config?.providers[provider].enabled}
+                          disabled={!providers[provider]?.enabled}
                         >
                           {showKey[provider] ? <EyeOff size={14} /> : <Eye size={14} />}
                         </button>
@@ -341,29 +352,18 @@ export const PaymentsPage: React.FC = () => {
                       <label className="block text-xs text-slate-500 mb-1">Webhook Secret</label>
                       <input
                         type="password"
-                        value={webhookSecrets[provider]}
+                        value={webhookSecrets[provider] || ''}
                         onChange={(e) => setWebhookSecrets((prev) => ({ ...prev, [provider]: e.target.value }))}
                         placeholder={
-                          config?.providers[provider].enabled
+                          providers[provider]?.enabled
                             ? `Enter webhook secret...`
                             : 'Provider disabled'
                         }
-                        disabled={!config?.providers[provider].enabled}
+                        disabled={!providers[provider]?.enabled}
                         className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-600 font-mono focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       />
                     </div>
                   </div>
-                  {/* Provider doc link */}
-                  {config?.providers[provider].enabled && (
-                    <a
-                      href="#"
-                      className="inline-flex items-center gap-1 mt-2 text-xs text-slate-500 hover:text-blue-400 transition-colors"
-                      onClick={(e) => e.preventDefault()}
-                    >
-                      <ExternalLink size={10} />
-                      {providerLabel(provider)} dashboard
-                    </a>
-                  )}
                 </div>
               ))}
             </div>
@@ -501,6 +501,15 @@ export const PaymentsPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Toast notifications */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 };

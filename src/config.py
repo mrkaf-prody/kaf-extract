@@ -46,6 +46,76 @@ class Settings(BaseSettings):
     rate_limit_requests: int = 100
     rate_limit_window_seconds: int = 60
 
+    # ------------------------------------------------------------------
+    # Phase 4: Payment system
+    # ------------------------------------------------------------------
+
+    # Active payment provider: "lemonsqueezy", "paddle", or "manual"
+    payment_provider: str = "manual"
+
+    # LemonSqueezy
+    lemonsqueezy_api_key: str = ""
+    lemonsqueezy_store_id: str = ""
+    lemonsqueezy_webhook_secret: str = ""
+    lemonsqueezy_test_mode: bool = True
+    # Plan variant IDs (set these in production)
+    lemonsqueezy_variant_hobby: str = ""
+    lemonsqueezy_variant_pro: str = ""
+    lemonsqueezy_variant_enterprise: str = ""
+
+    # Paddle
+    paddle_api_key: str = ""
+    paddle_webhook_secret: str = ""
+    paddle_test_mode: bool = True
+    # Paddle price IDs per plan
+    paddle_price_hobby: str = ""
+    paddle_price_pro: str = ""
+    paddle_price_enterprise: str = ""
+
+    # Trial system
+    trial_duration_days: int = 7
+    trial_extraction_limit: int = 100
+
+    # Email (Resend)
+    resend_api_key: str = ""
+    email_from: str = "noreply@kafextract.com"
+
+    # Invoices
+    invoices_dir: str = "/app/data/invoices"
+
+    # Plan definitions
+    plans: dict = {
+        "hobby": {
+            "name": "Hobby",
+            "price_cents": 0,
+            "extractions_per_month": 1000,
+            "features": ["Basic extraction", "Community support"],
+        },
+        "pro": {
+            "name": "Pro",
+            "price_cents": 2900,
+            "extractions_per_month": 50000,
+            "features": [
+                "AI-powered extraction",
+                "Batch processing",
+                "Priority support",
+                "Export formats",
+            ],
+        },
+        "enterprise": {
+            "name": "Enterprise",
+            "price_cents": 19900,
+            "extractions_per_month": 500000,
+            "features": [
+                "Everything in Pro",
+                "Custom integrations",
+                "Dedicated support",
+                "SLA guarantee",
+                "SSO",
+            ],
+        },
+    }
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
