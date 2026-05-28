@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget ca-certificates fonts-liberation libasound2 libatk-bridge2.0-0 \
@@ -9,17 +9,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
+# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-RUN python3 -m playwright install chromium
+# Install Crawl4AI browsers (bundled Playwright Chromium)
+RUN python3 -m crawl4ai install 2>/dev/null || python3 -m playwright install chromium
 
 COPY src/ ./src/
+COPY alembic.ini .
+COPY alembic/ ./alembic/
 RUN mkdir -p /app/data
 
 EXPOSE 8000
 
-# Run a pre-flight import check before starting server
+# Pre-flight check
 RUN python3 -c "from src.main import app; print('OK: app imported successfully')"
 
+# Start API server
 CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]

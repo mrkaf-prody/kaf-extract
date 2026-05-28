@@ -1,14 +1,72 @@
 version: "3.9"
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: kafextract
+      POSTGRES_PASSWORD: kafextract
+      POSTGRES_DB: kafextract
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kafextract"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    command: redis-server --appendonly yes --save 60 1
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   api:
     build: .
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=sqlite:///./data/kaf-extract.db
-      - DEV_API_KEY=${DEV_API_KEY:-kaf-extract-dev-key-change-in-production}
-      - PLAYWRIGHT_HEADLESS=true
+      - DATABASE_URL=postgresql+asyncpg://kafextract:kafextract@postgres:5432/kafextract
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production-use-a-long-random-string}
+      - CRAWL4AI_HEADLESS=true
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://localhost:11434/v1}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-kimi-k2.6:cloud}
     volumes:
       - ./data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
+
+  # arq worker for async extraction jobs
+  worker:
+    build: .
+    command: arq src.services.queue.WorkerSettings
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://kafextract:kafextract@postgres:5432/kafextract
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production-use-a-long-random-string}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
