@@ -29,12 +29,6 @@ COPY alembic.ini .
 COPY alembic/ ./alembic/
 RUN mkdir -p /app/data
 
-# Ensure admin_static is included (built React admin dashboard)
-RUN mkdir -p /app/src/admin_static
-
-# Include user dashboard build
-COPY user-dashboard/dist/ ./user-dashboard/dist/
-
 EXPOSE 8000
 
 # Pre-flight check

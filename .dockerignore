@@ -12,3 +12,5 @@ venv/
 docs/
 tests/
 README.md
+user-dashboard/dist/
+user-dashboard/node_modules/
