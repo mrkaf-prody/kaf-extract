@@ -347,6 +347,25 @@ class KafExtract:
         self._raise_for_status(resp)
         return resp.json()
 
+    # ── Integrations ───────────────────────────────────────────────
+
+    async def test_slack_webhook(self, webhook_url: str) -> dict:
+        """Test a Slack webhook URL by sending a sample notification."""
+        client = await self._get_client()
+        resp = await client.post(
+            "/api/v1/integrations/slack/test",
+            json={"webhook_url": webhook_url},
+        )
+        self._raise_for_status(resp)
+        return resp.json()
+
+    async def extraction_history(self, limit: int = 20) -> dict:
+        """Get recent extraction history for export/download."""
+        client = await self._get_client()
+        resp = await client.get(f"/api/v1/extract/history?limit={limit}")
+        self._raise_for_status(resp)
+        return resp.json()
+
     # ── Scheduled Extractions ──────────────────────────────────────
 
     async def create_schedule(

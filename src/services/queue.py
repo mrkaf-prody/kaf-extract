@@ -405,9 +405,10 @@ async def dispatch_webhook(
 ) -> bool:
     """Dispatch a webhook callback with retry and HMAC-SHA256 signing.
 
+    Detects Slack webhook URLs and formats the message using Slack Block Kit.
+    For non-Slack URLs, sends the raw JSON payload with X-Kaf-Signature header.
+
     Retries with exponential backoff: 1s, 4s, 16s.
-    Adds X-Kaf-Signature header with HMAC-SHA256 of JSON payload.
-    Uses JWT_SECRET as the HMAC signing key.
 
     Args:
         webhook_url: The URL to POST the payload to.
@@ -417,13 +418,33 @@ async def dispatch_webhook(
     Returns:
         True if the webhook was delivered successfully, False otherwise.
     """
-    signature = sign_payload(payload, settings.jwt_secret)
-    headers = {
-        "Content-Type": "application/json",
-        "X-Kaf-Signature": signature,
-    }
+    is_slack = "hooks.slack.com" in webhook_url
 
-    body = json.dumps(payload, default=str)
+    if is_slack:
+        # Format as a Slack Block Kit message
+        from src.services.slack import _build_slack_payload
+
+        extraction_url = payload.get("metadata", {}).get("url", "unknown")
+        status = payload.get("status", "unknown")
+        data = payload.get("data")
+        job_id = payload.get("metadata", {}).get("job_id")
+
+        slack_payload = _build_slack_payload(
+            url=extraction_url,
+            status=status,
+            data=data,
+            job_id=job_id,
+        )
+        body = json.dumps(slack_payload, default=str)
+        headers = {"Content-Type": "application/json"}
+    else:
+        # Standard webhook with HMAC signature
+        signature = sign_payload(payload, settings.jwt_secret)
+        headers = {
+            "Content-Type": "application/json",
+            "X-Kaf-Signature": signature,
+        }
+        body = json.dumps(payload, default=str)
 
     last_error = None
     for attempt in range(max_retries + 1):
