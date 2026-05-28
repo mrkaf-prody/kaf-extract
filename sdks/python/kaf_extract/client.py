@@ -366,6 +366,84 @@ class KafExtract:
         self._raise_for_status(resp)
         return resp.json()
 
+    # ── Organizations / Teams ──────────────────────────────────────
+
+    async def create_org(
+        self, name: str, slug: str, billing_email: str | None = None
+    ) -> dict:
+        """Create a new organization/team. You become the owner."""
+        client = await self._get_client()
+        resp = await client.post(
+            "/api/v1/orgs",
+            json={"name": name, "slug": slug, "billing_email": billing_email},
+        )
+        self._raise_for_status(resp)
+        return resp.json()
+
+    async def list_orgs(self) -> dict:
+        """List all organizations you belong to."""
+        client = await self._get_client()
+        resp = await client.get("/api/v1/orgs")
+        self._raise_for_status(resp)
+        return resp.json()
+
+    async def get_org(self, org_id: str) -> dict:
+        """Get organization details."""
+        client = await self._get_client()
+        resp = await client.get(f"/api/v1/orgs/{org_id}")
+        self._raise_for_status(resp)
+        return resp.json()
+
+    async def delete_org(self, org_id: str) -> None:
+        """Delete an organization (owner only)."""
+        client = await self._get_client()
+        resp = await client.delete(f"/api/v1/orgs/{org_id}")
+        self._raise_for_status(resp)
+
+    async def invite_member(
+        self, org_id: str, email: str, role: str = "member"
+    ) -> dict:
+        """Invite a user to an organization by email."""
+        client = await self._get_client()
+        resp = await client.post(
+            f"/api/v1/orgs/{org_id}/members",
+            json={"email": email, "role": role},
+        )
+        self._raise_for_status(resp)
+        return resp.json()
+
+    async def list_members(self, org_id: str) -> dict:
+        """List all members of an organization."""
+        client = await self._get_client()
+        resp = await client.get(f"/api/v1/orgs/{org_id}/members")
+        self._raise_for_status(resp)
+        return resp.json()
+
+    async def change_member_role(
+        self, org_id: str, user_id: str, role: str
+    ) -> dict:
+        """Change a member's role (admin/member/viewer)."""
+        client = await self._get_client()
+        resp = await client.put(
+            f"/api/v1/orgs/{org_id}/members/{user_id}/role",
+            json={"role": role},
+        )
+        self._raise_for_status(resp)
+        return resp.json()
+
+    async def remove_member(self, org_id: str, user_id: str) -> None:
+        """Remove a member from the organization."""
+        client = await self._get_client()
+        resp = await client.delete(f"/api/v1/orgs/{org_id}/members/{user_id}")
+        self._raise_for_status(resp)
+
+    async def org_usage(self, org_id: str) -> dict:
+        """Get extraction usage per member."""
+        client = await self._get_client()
+        resp = await client.get(f"/api/v1/orgs/{org_id}/usage")
+        self._raise_for_status(resp)
+        return resp.json()
+
     # ── Scheduled Extractions ──────────────────────────────────────
 
     async def create_schedule(

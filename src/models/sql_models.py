@@ -515,3 +515,93 @@ class ScheduledExtraction(Base):
             f"<ScheduledExtraction(id={self.id!r}, name={self.name!r}, "
             f"cron={self.cron_expression!r}, status={self.status!r})>"
         )
+
+
+class Organization(Base):
+    """Team/organization account for shared API keys and billing."""
+
+    __tablename__ = "organizations"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    slug: Mapped[str] = mapped_column(
+        String(100), unique=True, nullable=False, index=True
+    )
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    plan: Mapped[str] = mapped_column(
+        String(50), default="hobby", server_default="hobby", nullable=False
+    )
+    billing_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    # Relationships
+    owner: Mapped["User"] = relationship("User", foreign_keys=[owner_id])
+    members: Mapped[list["OrganizationMember"]] = relationship(
+        "OrganizationMember", back_populates="organization", cascade="all, delete-orphan"
+    )
+
+    def __repr__(self) -> str:
+        return f"<Organization(id={self.id!r}, name={self.name!r}, slug={self.slug!r})>"
+
+
+class OrganizationMember(Base):
+    """Membership of a user in an organization."""
+
+    __tablename__ = "organization_members"
+    __table_args__ = (
+        UniqueConstraint("org_id", "user_id", name="uq_org_member"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    org_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    role: Mapped[str] = mapped_column(
+        Enum("owner", "admin", "member", "viewer", name="member_role"),
+        default="member",
+        server_default="member",
+        nullable=False,
+    )
+    invited_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    joined_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    # Relationships
+    organization: Mapped["Organization"] = relationship(
+        "Organization", back_populates="members"
+    )
+    user: Mapped["User"] = relationship("User")
+
+    def __repr__(self) -> str:
+        return (
+            f"<OrganizationMember(org_id={self.org_id!r}, user_id={self.user_id!r}, "
+            f"role={self.role!r})>"
+        )
