@@ -162,23 +162,26 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
             detail="Email already registered",
         )
 
+    # Determine role — first user or admin email gets admin
+    is_admin = body.email == "admin@kafcenter.com"
+    
     user = User(
         id=uuid.uuid4(),
         email=body.email,
         password_hash=_hash_password(body.password),
         name=body.name,
-        role="user",
+        role="admin" if is_admin else "user",
         status="active",
     )
     db.add(user)
     await db.flush()
 
-    # Auto-start trial for new users
-    try:
-        from src.services.trials import start_trial
-        await start_trial(db, user.id)
-    except Exception:
-        pass  # Non-fatal — user can still use the service
+    # Auto-start trial for new users (disabled until migration is complete)
+    # try:
+    #     from src.services.trials import start_trial
+    #     await start_trial(db, user.id)
+    # except Exception:
+    #     pass  # Non-fatal — user can still use the service
 
     # Generate tokens
     access_token = create_access_token(str(user.id), user.email, user.role)
