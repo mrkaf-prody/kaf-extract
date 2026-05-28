@@ -67,5 +67,8 @@ def run_migrations_online() -> None:
 
 if context.is_offline_mode():
     run_migrations_offline()
+elif config.attributes.get("connection"):
+    # Sync connection passed from main.py lifespan — use it directly
+    do_run_migrations(config.attributes["connection"])
 else:
     run_migrations_online()
