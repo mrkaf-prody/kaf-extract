@@ -31,3 +31,5 @@ RUN python3 -c "from src.main import app; print('OK: app imported successfully')
 
 # Start API server
 CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# Build cache buster 1779987619
