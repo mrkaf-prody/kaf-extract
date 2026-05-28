@@ -56,6 +56,15 @@ class UserResponse(BaseModel):
     created_at: str
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+
+class UpdateProfileRequest(BaseModel):
+    name: str | None = None
+
+
 class MessageResponse(BaseModel):
     message: str
 
@@ -176,12 +185,12 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     db.add(user)
     await db.flush()
 
-    # Auto-start trial for new users (disabled until migration is complete)
-    # try:
-    #     from src.services.trials import start_trial
-    #     await start_trial(db, user.id)
-    # except Exception:
-    #     pass  # Non-fatal — user can still use the service
+    # Auto-start trial for new users
+    try:
+        from src.services.trials import start_trial
+        await start_trial(db, user.id)
+    except Exception:
+        pass  # Non-fatal — user can still use the service
 
     # Generate tokens
     access_token = create_access_token(str(user.id), user.email, user.role)
@@ -255,6 +264,62 @@ async def me(current_user: dict = Depends(get_current_user), db: AsyncSession = 
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    return UserResponse(
+        id=str(user.id),
+        email=user.email,
+        name=user.name,
+        role=user.role,
+        status=user.status,
+        created_at=user.created_at.isoformat() if user.created_at else "",
+    )
+
+
+@router.put("/me/password", response_model=MessageResponse)
+async def change_password(
+    body: ChangePasswordRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Change the current user's password."""
+    result = await db.execute(
+        select(User).where(User.id == current_user["user_id"])
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    # Verify current password
+    if not _verify_password(body.current_password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Current password is incorrect",
+        )
+
+    # Update password
+    user.password_hash = _hash_password(body.new_password)
+    await db.flush()
+
+    return MessageResponse(message="Password changed successfully")
+
+
+@router.put("/me/profile", response_model=UserResponse)
+async def update_profile(
+    body: UpdateProfileRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update the current user's profile (name only for now)."""
+    result = await db.execute(
+        select(User).where(User.id == current_user["user_id"])
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if body.name is not None:
+        user.name = body.name
+    await db.flush()
 
     return UserResponse(
         id=str(user.id),
