@@ -14,6 +14,16 @@ from src.routers import auth, extract, health, keys, metrics, subscriptions, vou
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup/shutdown lifecycle — init Redis, verify Crawl4AI, init DB."""
+    # Run database migrations
+    try:
+        from alembic.config import Config
+        from alembic import command
+        alembic_cfg = Config("alembic.ini")
+        command.upgrade(alembic_cfg, "head")
+    except Exception as e:
+        import sys
+        print(f"WARNING: Migration failed (non-fatal): {e}", file=sys.stderr)
+
     # Connect Redis (caching + rate limiter + job queue)
     try:
         from src.services.cache import connect_redis
