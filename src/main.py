@@ -150,6 +150,7 @@ async def add_rate_limit_headers(request, call_next):
 
 
 # API routes
+app.include_router(schedules.router, prefix="/api/v1")
 app.include_router(extract.router, prefix="/api/v1")
 app.include_router(auth.router)
 app.include_router(health.router)
@@ -159,7 +160,6 @@ app.include_router(subscriptions.router)
 app.include_router(vouchers.router)
 app.include_router(admin_payments.router)
 app.include_router(webhooks.router)
-app.include_router(schedules.router, prefix="/api/v1")
 
 # ── Admin Dashboard (SPA) ──────────────────────────────────────────
 
