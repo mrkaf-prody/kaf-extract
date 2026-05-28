@@ -161,13 +161,17 @@ async def admin_spa_fallback(full_path: str):
 async def admin_index():
     return FileResponse(os.path.join(ADMIN_DIR, "index.html"))
 
-# Mount static assets (JS, CSS, images)
+# Mount static assets (JS, CSS, images) — at root because Vite builds with root-relative paths
 if os.path.isdir(ADMIN_DIR):
-    app.mount("/admin/assets", StaticFiles(directory=os.path.join(ADMIN_DIR, "assets")), name="admin_assets")
-    # Also serve root-level files (favicon, icons)
-    for fname in ["favicon.svg", "icons.svg"]:
-        fpath = os.path.join(ADMIN_DIR, fname)
-        if os.path.isfile(fpath):
-            @app.get(f"/admin/{fname}", include_in_schema=False)
-            async def _serve(fpath=fpath):
-                return FileResponse(fpath)
+    app.mount("/assets", StaticFiles(directory=os.path.join(ADMIN_DIR, "assets")), name="admin_assets")
+    # Also serve root-level files (favicon, icons) — define individually to avoid closure bug
+    fv_path = os.path.join(ADMIN_DIR, "favicon.svg")
+    if os.path.isfile(fv_path):
+        @app.get("/favicon.svg", include_in_schema=False)
+        async def _serve_favicon():
+            return FileResponse(fv_path)
+    ic_path = os.path.join(ADMIN_DIR, "icons.svg")
+    if os.path.isfile(ic_path):
+        @app.get("/icons.svg", include_in_schema=False)
+        async def _serve_icons():
+            return FileResponse(ic_path)
