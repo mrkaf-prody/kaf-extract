@@ -63,18 +63,30 @@ class MessageResponse(BaseModel):
 # --- Helpers ---
 
 def _hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    try:
+        return pwd_context.hash(password)
+    except Exception:
+        import bcrypt
+        return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
 def _verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    try:
+        return pwd_context.verify(plain, hashed)
+    except Exception:
+        import bcrypt
+        return bcrypt.checkpw(plain.encode(), hashed.encode())
 
 
 async def _store_refresh_token(
     db: AsyncSession, user_id: uuid.UUID, raw_token: str
 ) -> None:
     """Hash and store a refresh token in the database."""
-    token_hash = pwd_context.hash(raw_token)
+    try:
+        token_hash = pwd_context.hash(raw_token)
+    except Exception:
+        import bcrypt
+        token_hash = bcrypt.hashpw(raw_token.encode(), bcrypt.gensalt()).decode()
     expires_at = datetime.now(UTC) + timedelta(days=settings.jwt_refresh_expire_days)
     rt = RefreshToken(
         id=uuid.uuid4(),
