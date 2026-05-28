@@ -111,9 +111,6 @@ class LemonSqueezyProvider(PaymentProvider):
                         "plan": plan,
                     }
                 },
-                "product_options": {
-                    "enabled_variants": [variant_id],
-                },
             },
             "relationships": {
                 "store": {
