@@ -108,17 +108,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Debug: return traceback on 500 for auth endpoints
-import traceback as _traceback
-from fastapi.responses import JSONResponse
-
-@app.exception_handler(Exception)
-async def debug_exception_handler(request, exc):
-    return JSONResponse(
-        status_code=500,
-        content={"detail": str(exc), "type": type(exc).__name__, "traceback": _traceback.format_exc().split("\n")[-10:]},
-    )
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
