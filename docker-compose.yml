@@ -40,11 +40,9 @@ services:
       - DATABASE_URL=postgresql+asyncpg://kafextract:kafextract@postgres:5432/kafextract
       - REDIS_URL=redis://redis:6379/0
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production-use-a-long-random-string}
-      - JWT_ALGORITHM=HS256
-      - JWT_EXPIRE_MINUTES=30
-      - JWT_REFRESH_EXPIRE_DAYS=7
-      - DEV_API_KEY=${DEV_API_KEY:-kaf-extract-dev-key-change-in-production}
-      - PLAYWRIGHT_HEADLESS=true
+      - CRAWL4AI_HEADLESS=true
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://localhost:11434/v1}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-kimi-k2.6:cloud}
     volumes:
       - ./data:/app/data
     depends_on:
@@ -54,6 +52,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # arq worker for async extraction jobs
   worker:
     build: .
     command: arq src.services.queue.WorkerSettings
@@ -61,9 +60,6 @@ services:
       - DATABASE_URL=postgresql+asyncpg://kafextract:kafextract@postgres:5432/kafextract
       - REDIS_URL=redis://redis:6379/0
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production-use-a-long-random-string}
-      - PLAYWRIGHT_HEADLESS=true
-    volumes:
-      - ./data:/app/data
     depends_on:
       postgres:
         condition: service_healthy
