@@ -42,7 +42,16 @@ async def get_usage(
     db: AsyncSession = Depends(get_db),
 ):
     """Get current usage stats for the authenticated user."""
-    user_id = UUID(current_user["user_id"])
+    import traceback, sys
+    try:
+        return await _get_usage_impl(current_user, db)
+    except Exception as e:
+        traceback.print_exc(file=sys.stderr)
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}")
+
+
+async def _get_usage_impl(current_user, db):
+    user_id = current_user["user_id"]
 
     result = await db.execute(
         select(UsageAlert).where(UsageAlert.user_id == user_id)
@@ -85,7 +94,7 @@ async def set_limits(
     db: AsyncSession = Depends(get_db),
 ):
     """Set monthly usage limits and hard cap."""
-    user_id = UUID(current_user["user_id"])
+    user_id = current_user["user_id"]
 
     result = await db.execute(
         select(UsageAlert).where(UsageAlert.user_id == user_id)
@@ -131,7 +140,7 @@ async def track_usage(
     current_user: dict = Depends(get_current_user),
 ):
     """Increment usage counter (called after successful extraction)."""
-    user_id = UUID(current_user["user_id"])
+    user_id = current_user["user_id"]
     key = os.getenv("RESEND_API_KEY", "")
     result = await increment_usage(user_id, resend_key=key if key else None)
     return result
