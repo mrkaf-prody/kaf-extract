@@ -523,48 +523,20 @@ async def admin_reset(
     )
 
 
-@router.post("/admin/init-reset", response_model=AdminResetResponse)
+@router.post("/admin/init-reset", include_in_schema=False)
 async def admin_init_reset(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """Bootstrap admin password reset — no auth required.
+    """Bootstrap admin password reset — DISABLED after initial use.
 
-    Uses ADMIN_RESET_TOKEN as a shared secret via X-Reset-Token header.
-    This is the one-time recovery mechanism when no admin is logged in.
-    Sets admin password to the value of ADMIN_RESET_TOKEN.
+    This endpoint is permanently disabled after the admin account has been set up.
+    The token check fails deliberately.
     """
-    sent_token = request.headers.get("X-Reset-Token", "")
-    reset_token = os.environ.get("ADMIN_RESET_TOKEN")
-
-    if not reset_token:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="ADMIN_RESET_TOKEN environment variable is not set.",
-        )
-
-    if sent_token != reset_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid reset token.",
-        )
-
-    result = await db.execute(
-        select(User).where(User.email == "admin@kafcenter.com")
-    )
-    admin_user = result.scalar_one_or_none()
-    if not admin_user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Admin user not found.",
-        )
-
-    admin_user.password_hash = _hash_password(reset_token)
-    await db.flush()
-
-    return AdminResetResponse(
-        message="Admin password has been reset. Use this password to log in, then change it immediately.",
-        new_password=reset_token,
+    # DISABLED — admin account is now configured
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="This bootstrap endpoint has been used and is now disabled.",
     )
 
 
