@@ -11,15 +11,30 @@ import os
 from src.routers import auth, extract, health, keys, metrics, subscriptions, vouchers, webhooks, admin_payments
 
 
+def _run_migrations_sync(connection, alembic_cfg):
+    """Run alembic migrations synchronously (called via conn.run_sync)."""
+    from alembic import command
+    alembic_cfg.attributes["connection"] = connection
+    command.upgrade(alembic_cfg, "head")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup/shutdown lifecycle — init Redis, verify Crawl4AI, init DB."""
     # Run database migrations
     try:
         from alembic.config import Config
-        from alembic import command
+        from sqlalchemy import create_engine
+        from src.config import settings
+        
         alembic_cfg = Config("alembic.ini")
-        command.upgrade(alembic_cfg, "head")
+        alembic_cfg.set_main_option("sqlalchemy.url", settings.database_url.replace("+asyncpg", ""))
+        
+        sync_engine = create_engine(settings.database_url.replace("+asyncpg", ""))
+        with sync_engine.connect() as conn:
+            _run_migrations_sync(conn, alembic_cfg)
+            conn.commit()
+        sync_engine.dispose()
     except Exception as e:
         import sys
         print(f"WARNING: Migration failed (non-fatal): {e}", file=sys.stderr)
