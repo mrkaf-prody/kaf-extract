@@ -21,6 +21,8 @@ dependencies = [
     "alembic>=1.13.0",
     # Auth
     "python-jose[cryptography]>=3.3.0",
+    # Webhook dispatch
+    "httpx>=0.28",
 ]
 
 [project.optional-dependencies]
@@ -41,3 +43,4 @@ select = ["E", "F", "I", "N", "W"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+pythonpath = ["."]
