@@ -40,14 +40,26 @@ class ExtractorService:
 
     def __init__(self) -> None:
         self._crawler: AsyncWebCrawler | None = None
+        self._crawler_lock: asyncio.Lock = asyncio.Lock()
 
     async def _get_crawler(self) -> AsyncWebCrawler:
-        """Get or lazily create the AsyncWebCrawler singleton."""
-        if self._crawler is None:
+        """Get or lazily create the AsyncWebCrawler singleton.
+
+        Thread-safe: uses an asyncio.Lock to prevent multiple concurrent
+        crawler creations that could trigger Chromium launch races.
+        """
+        if self._crawler is not None:
+            return self._crawler
+
+        async with self._crawler_lock:
+            # Double-check after acquiring the lock
+            if self._crawler is not None:
+                return self._crawler
+
             browser_config = get_browser_config()
             self._crawler = AsyncWebCrawler(config=browser_config)
             await self._crawler.start()
-        return self._crawler
+            return self._crawler
 
     async def extract(self, url: str, fields: list[dict]) -> dict[str, Any]:
         """Extract fields from a web page.
@@ -444,10 +456,15 @@ class ExtractorService:
         return results
 
     async def close(self) -> None:
-        """Close the crawler and release resources."""
-        if self._crawler:
-            await self._crawler.close()
-            self._crawler = None
+        """Close the crawler and release resources.
+
+        Thread-safe: holds the crawler lock to ensure no concurrent
+        _get_crawler() is in progress.
+        """
+        async with self._crawler_lock:
+            if self._crawler:
+                await self._crawler.close()
+                self._crawler = None
 
     # ------------------------------------------------------------------
     # P2-3: Dedicated AI / LLM extraction

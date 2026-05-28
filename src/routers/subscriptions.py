@@ -175,6 +175,40 @@ async def create_checkout(
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
 
+    # --- Hobby (Free) Plan: auto-activate, no payment needed ---
+    if body.plan == "hobby":
+        from datetime import UTC, datetime as dt
+        from src.models.sql_models import Subscription
+
+        # Cancel any existing active subscription
+        existing = await db.execute(
+            select(Subscription).where(
+                Subscription.user_id == user_id, Subscription.status == "active"
+            )
+        )
+        for sub in existing.scalars():
+            sub.status = "canceled"
+            sub.canceled_at = dt.now(UTC)
+
+        # Create hobby subscription
+        new_sub = Subscription(
+            id=uuid.uuid4(),
+            user_id=user_id,
+            plan="hobby",
+            status="active",
+            provider="manual",
+        )
+        db.add(new_sub)
+        await db.flush()
+
+        return CheckoutResponse(
+            checkout_url="",
+            provider="manual",
+            plan="hobby",
+            message="Hobby plan activated — free forever. Start extracting!",
+        )
+
+    # --- Paid plans: use payment provider ---
     dispatcher = PaymentDispatcher()
     try:
         checkout = await dispatcher.create_checkout(

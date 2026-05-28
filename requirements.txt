@@ -24,4 +24,6 @@ redis[hiredis]>=5.0
 arq>=0.25
 # Scheduling
 croniter>=5.0
+# 2FA
+pyotp>=2.9
 

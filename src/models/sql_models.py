@@ -49,6 +49,7 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+    totp_secret: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Relationships
     api_keys: Mapped[list["ApiKey"]] = relationship(

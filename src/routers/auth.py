@@ -1,8 +1,10 @@
-"""Auth router — user registration, login, token refresh."""
+"""Auth router — user registration, login, token refresh, 2FA."""
 
+import os
 import uuid
 from datetime import UTC, datetime, timedelta
 
+import pyotp
 from fastapi import APIRouter, Depends, HTTPException, status
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr, Field
@@ -12,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.config import settings
 from src.db import get_db
 from src.middleware.auth import (
+    admin_required,
     create_access_token,
     create_refresh_token,
     decode_token,
@@ -53,6 +56,7 @@ class UserResponse(BaseModel):
     name: str | None
     role: str
     status: str
+    totp_enabled: bool
     created_at: str
 
 
@@ -67,6 +71,27 @@ class UpdateProfileRequest(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+class TOTPSetupResponse(BaseModel):
+    secret: str
+    qr_code_uri: str
+
+
+class TOTPVerifyRequest(BaseModel):
+    secret: str
+    code: str = Field(..., min_length=6, max_length=6)
+
+
+class TOTPLoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+    totp_code: str = Field(..., min_length=6, max_length=6)
+
+
+class AdminResetResponse(BaseModel):
+    message: str
+    new_password: str
 
 
 # --- Helpers ---
@@ -85,6 +110,19 @@ def _verify_password(plain: str, hashed: str) -> bool:
     except Exception:
         import bcrypt
         return bcrypt.checkpw(plain.encode(), hashed.encode())
+
+
+async def _create_token_response(
+    db: AsyncSession, user_id: uuid.UUID, email: str, role: str
+) -> TokenResponse:
+    """Create access + refresh tokens, store refresh token, return response."""
+    access_token = create_access_token(str(user_id), email, role)
+    refresh_token = create_refresh_token(str(user_id))
+    await _store_refresh_token(db, user_id, refresh_token)
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+    )
 
 
 async def _store_refresh_token(
@@ -193,19 +231,21 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
         pass  # Non-fatal — user can still use the service
 
     # Generate tokens
-    access_token = create_access_token(str(user.id), user.email, user.role)
-    refresh_token = create_refresh_token(str(user.id))
-    await _store_refresh_token(db, user.id, refresh_token)
-
-    return TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-    )
+    return await _create_token_response(db, user.id, user.email, user.role)
 
 
-@router.post("/login", response_model=TokenResponse)
+class LoginChallenge(BaseModel):
+    """Returned when user has 2FA enabled — requires a second step."""
+    requires_2fa: bool = True
+    message: str = "2FA is enabled. Please provide your TOTP code via /auth/2fa/login."
+
+
+@router.post(
+    "/login",
+    response_model=TokenResponse | LoginChallenge,
+)
 async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
-    """Login with email + password. Returns JWT tokens."""
+    """Login with email + password. If 2FA is enabled, return a challenge."""
     result = await db.execute(select(User).where(User.email == body.email))
     user = result.scalar_one_or_none()
 
@@ -221,14 +261,11 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
             detail="Account is suspended",
         )
 
-    access_token = create_access_token(str(user.id), user.email, user.role)
-    refresh_token = create_refresh_token(str(user.id))
-    await _store_refresh_token(db, user.id, refresh_token)
+    # If user has 2FA enabled, issue a challenge instead of tokens
+    if user.totp_secret:
+        return LoginChallenge()
 
-    return TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-    )
+    return await _create_token_response(db, user.id, user.email, user.role)
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -245,14 +282,7 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
             detail="User not found or inactive",
         )
 
-    access_token = create_access_token(str(user.id), user.email, user.role)
-    new_refresh_token = create_refresh_token(str(user.id))
-    await _store_refresh_token(db, user.id, new_refresh_token)
-
-    return TokenResponse(
-        access_token=access_token,
-        refresh_token=new_refresh_token,
-    )
+    return await _create_token_response(db, user.id, user.email, user.role)
 
 
 @router.get("/me", response_model=UserResponse)
@@ -271,6 +301,7 @@ async def me(current_user: dict = Depends(get_current_user), db: AsyncSession = 
         name=user.name,
         role=user.role,
         status=user.status,
+        totp_enabled=bool(user.totp_secret),
         created_at=user.created_at.isoformat() if user.created_at else "",
     )
 
@@ -327,5 +358,168 @@ async def update_profile(
         name=user.name,
         role=user.role,
         status=user.status,
+        totp_enabled=bool(user.totp_secret),
         created_at=user.created_at.isoformat() if user.created_at else "",
     )
+
+
+# --- 2FA Endpoints ---
+
+
+@router.post("/2fa/setup", response_model=TOTPSetupResponse)
+async def setup_2fa(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate TOTP secret and QR code URI for setup.
+    
+    The secret is NOT saved yet — user must verify via /auth/2fa/verify first.
+    """
+    result = await db.execute(
+        select(User).where(User.id == current_user["user_id"])
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if user.totp_secret:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="2FA is already configured. Disable it first to reconfigure.",
+        )
+
+    # Generate a new secret
+    secret = pyotp.random_base32()
+    totp = pyotp.TOTP(secret)
+    qr_uri = totp.provisioning_uri(
+        name=user.email,
+        issuer_name="Kaf Extract",
+    )
+
+    return TOTPSetupResponse(
+        secret=secret,
+        qr_code_uri=qr_uri,
+    )
+
+
+@router.post("/2fa/verify", response_model=MessageResponse)
+async def verify_2fa(
+    body: TOTPVerifyRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Verify a TOTP code and save the secret (completes 2FA setup).
+
+    The secret must have been generated via /auth/2fa/setup.
+    Send both 'secret' and 'code' in the request body.
+    """
+    result = await db.execute(
+        select(User).where(User.id == current_user["user_id"])
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if user.totp_secret:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="2FA is already configured.",
+        )
+
+    # Verify the TOTP code
+    totp = pyotp.TOTP(body.secret)
+    if not totp.verify(body.code):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid TOTP code. Please try again.",
+        )
+
+    # Save the secret — 2FA is now active
+    user.totp_secret = body.secret
+    await db.flush()
+
+    return MessageResponse(message="2FA has been enabled successfully.")
+
+
+@router.post("/2fa/login", response_model=TokenResponse)
+async def login_2fa(
+    body: TOTPLoginRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Complete login with TOTP code after password verification.
+
+    Use this endpoint when the user has 2FA enabled.
+    The normal /auth/login endpoint returns a challenge if 2FA is active.
+    """
+    result = await db.execute(select(User).where(User.email == body.email))
+    user = result.scalar_one_or_none()
+
+    if not user or not _verify_password(body.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    if user.status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is suspended",
+        )
+
+    if not user.totp_secret:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="2FA is not enabled for this account. Use /auth/login instead.",
+        )
+
+    # Verify TOTP code
+    totp = pyotp.TOTP(user.totp_secret)
+    if not totp.verify(body.totp_code):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid TOTP code.",
+        )
+
+    return await _create_token_response(db, user.id, user.email, user.role)
+
+
+# --- Admin Endpoints ---
+
+
+@router.post("/admin/reset", response_model=AdminResetResponse)
+async def admin_reset(
+    current_user: dict = Depends(admin_required),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reset the admin password using ADMIN_RESET_TOKEN env var.
+
+    Requires admin authentication. Returns the new password
+    so the admin can log in and change it immediately.
+    """
+    reset_token = os.environ.get("ADMIN_RESET_TOKEN")
+    if not reset_token:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="ADMIN_RESET_TOKEN environment variable is not set.",
+        )
+
+    # Update the admin user's password
+    result = await db.execute(
+        select(User).where(User.email == "admin@kafcenter.com")
+    )
+    admin_user = result.scalar_one_or_none()
+    if not admin_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Admin user not found.",
+        )
+
+    admin_user.password_hash = _hash_password(reset_token)
+    await db.flush()
+
+    return AdminResetResponse(
+        message="Admin password has been reset successfully.",
+        new_password=reset_token,
+    )
+
+
