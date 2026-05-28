@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Zap, LogIn } from 'lucide-react';
 
@@ -73,6 +74,13 @@ export const LoginPage: React.FC = () => {
             <LogIn size={16} />
             {submitting ? 'Signing in...' : 'Sign In'}
           </button>
+
+          <p className="text-center text-sm text-slate-500 pt-2">
+            Don't have an account?{' '}
+            <Link to="/dashboard/register" className="text-blue-400 hover:text-blue-300 transition-colors">
+              Create one
+            </Link>
+          </p>
         </form>
       </div>
     </div>

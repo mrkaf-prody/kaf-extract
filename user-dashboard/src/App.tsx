@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DashboardLayout } from './components/DashboardLayout';
 import { LoginPage } from './pages/LoginPage';
+import { RegisterPage } from './pages/RegisterPage';
 import { OverviewPage } from './pages/OverviewPage';
 import { ApiKeysPage } from './pages/ApiKeysPage';
 import { UsagePage } from './pages/UsagePage';
@@ -25,6 +26,7 @@ const App: React.FC = () => (
     <AuthProvider>
       <Routes>
         <Route path="/dashboard/login" element={<LoginPage />} />
+        <Route path="/dashboard/register" element={<RegisterPage />} />
         <Route
           path="/dashboard"
           element={
