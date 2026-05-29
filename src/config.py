@@ -69,6 +69,10 @@ class Settings(BaseSettings):
     manual_trial_extractions: int = 100
     manual_trial_days: int = 14
 
+    # --- Auto-trial config (used by src.services.trials.start_trial) ---
+    trial_duration_days: int = 7
+    trial_extraction_limit: int = 100
+
     # Invoices
     invoices_dir: str = "/app/data/invoices"
 

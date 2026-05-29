@@ -10,6 +10,12 @@ interface User {
   totp_enabled?: boolean;
 }
 
+interface Toast {
+  id: number;
+  type: 'error' | 'success';
+  message: string;
+}
+
 interface AuthCtx {
   user: User | null;
   token: string | null;
@@ -17,6 +23,9 @@ interface AuthCtx {
   logout: () => void;
   loading: boolean;
   apiFetch: (path: string, opts?: RequestInit) => Promise<any>;
+  showError: (msg: string) => void;
+  showSuccess: (msg: string) => void;
+  initSession: (accessToken: string) => Promise<void>;
   setUser: (u: User) => void;
 }
 
@@ -26,10 +35,28 @@ export const useAuth = () => useContext(AuthContext);
 const API_BASE = 'https://extract.kafcenter.com';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const raw = localStorage.getItem('user_cache');
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  });
   const [token, setToken] = useState<string | null>(localStorage.getItem('access_token'));
   const [loading, setLoading] = useState(true);
-  const initRef = useRef(false);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const toastIdRef = useRef(0);
+
+  const showError = useCallback((msg: string) => {
+    const id = ++toastIdRef.current;
+    setToasts(prev => [...prev, { id, type: 'error', message: msg }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+  }, []);
+
+  const showSuccess = useCallback((msg: string) => {
+    const id = ++toastIdRef.current;
+    setToasts(prev => [...prev, { id, type: 'success', message: msg }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+  }, []);
 
   const fetchMe = useCallback(async (t: string) => {
     try {
@@ -39,11 +66,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (res.ok) {
         const u = await res.json();
         setUser(u);
+        localStorage.setItem('user_cache', JSON.stringify(u));
         return;
       }
-    } catch (e) {
-      console.error('fetchMe error:', e);
-    }
+    } catch {}
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('user_cache');
@@ -52,15 +78,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
-    if (initRef.current) return;
-    initRef.current = true;
-    const t = localStorage.getItem('access_token');
-    if (!t) { setLoading(false); return; }
-    setToken(t);
-    const cached = localStorage.getItem('user_cache');
-    if (cached) { try { setUser(JSON.parse(cached)); } catch {} }
-    fetchMe(t).finally(() => setLoading(false));
-  }, []);
+    if (token) {
+      // Already have user from cache? Skip fetch
+      const cached = localStorage.getItem('user_cache');
+      if (!cached) {
+        fetchMe(token).finally(() => setLoading(false));
+      } else {
+        setLoading(false);
+      }
+    } else {
+      setLoading(false);
+    }
+  }, [token, fetchMe]);
 
   const login = async (email: string, password: string) => {
     const res = await fetch(`${API_BASE}/auth/login`, {
@@ -73,16 +102,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error(e.detail || 'Login failed');
     }
     const data = await res.json();
-    if (data.requires_2fa) {
-      throw new Error(data.message || '2FA required');
-    }
     localStorage.setItem('access_token', data.access_token);
     localStorage.setItem('refresh_token', data.refresh_token);
+    setToken(data.access_token);
+
     if (data.user) {
+      // Fast path: user info came back with tokens — no extra /auth/me round-trip
       setUser(data.user);
       localStorage.setItem('user_cache', JSON.stringify(data.user));
+    } else {
+      // Backward-compat: fetch /auth/me for older backends
+      await fetchMe(data.access_token);
     }
-    setToken(data.access_token);
+  };
+
+  const initSession = async (accessToken: string) => {
+    localStorage.setItem('access_token', accessToken);
+    setToken(accessToken);
+    await fetchMe(accessToken);
   };
 
   const logout = () => {
@@ -93,12 +130,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
-  const apiFetch = useCallback(async (path: string, opts: RequestInit = {}) => {
-    const currentToken = localStorage.getItem('access_token');
+  const apiFetch = async (path: string, opts: RequestInit = {}) => {
     const headers: Record<string, string> = {
       ...(opts.headers as Record<string, string> || {}),
     };
-    if (currentToken) headers['Authorization'] = `Bearer ${currentToken}`;
+    if (token) headers['Authorization'] = `Bearer ${token}`;
     if (!(opts.body instanceof FormData)) headers['Content-Type'] = 'application/json';
     const res = await fetch(`${API_BASE}${path}`, { ...opts, headers });
     if (res.status === 401) {
@@ -110,11 +146,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error(e.detail);
     }
     return res.json();
-  }, []);
+  };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading, apiFetch, setUser }}>
+    <AuthContext.Provider value={{ user, token, login, logout, loading, apiFetch, showError, showSuccess, initSession, setUser }}>
       {children}
+      <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">
+        {toasts.map(t => (
+          <div
+            key={t.id}
+            className={`pointer-events-auto max-w-sm rounded-lg px-4 py-3 shadow-lg text-sm font-medium transition-all
+              ${t.type === 'error'
+                ? 'bg-red-900/90 border border-red-700 text-red-100'
+                : 'bg-emerald-900/90 border border-emerald-700 text-emerald-100'
+              }`}
+          >
+            {t.message}
+          </div>
+        ))}
+      </div>
     </AuthContext.Provider>
   );
 };

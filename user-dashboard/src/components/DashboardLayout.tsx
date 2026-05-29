@@ -10,6 +10,7 @@ const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Overview', end: true },
   { to: '/dashboard/keys', icon: Key, label: 'API Keys' },
   { to: '/dashboard/usage', icon: BarChart3, label: 'Usage' },
+  { to: '/dashboard/profile', icon: User, label: 'Profile' },
   { to: '/dashboard/billing', icon: CreditCard, label: 'Billing' },
 ];
 

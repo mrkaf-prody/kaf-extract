@@ -42,7 +42,7 @@ export const RegisterPage = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Registration failed');
 
-      // Set user directly from register response — no extra /auth/me round-trip
+      // Initialize session directly (fast: user + tokens from register response)
       if (data.user) {
         setUser(data.user);
         localStorage.setItem('user_cache', JSON.stringify(data.user));
