@@ -28,59 +28,7 @@ interface RecentError {
   message: string;
 }
 
-// ─── Mock data ───
-
-let mockCounter = 0;
-
-function generateMockMetrics(): SystemMetrics {
-  mockCounter++;
-  // Simulate slight variations
-  const jitter = (base: number, range: number) => base + Math.floor((Math.random() - 0.5) * range);
-  const dbOk = mockCounter % 20 !== 0;  // occasional blip
-  const redisOk = mockCounter % 35 !== 0;
-
-  const errorEndpoints = ['POST /v1/extract', 'GET /v1/files/:id', 'POST /v1/auth/refresh'];
-  const errorMessages = [
-    'Rate limit exceeded',
-    'Invalid API key',
-    'Database connection timeout',
-    'Validation error: missing required field "url"',
-    'Internal server error',
-  ];
-
-  return {
-    total_requests: jitter(284621 + mockCounter * 17, 500),
-    active_jobs: jitter(12, 6),
-    queue_depth: jitter(8, 5),
-    cache_hit_rate: jitter(68, 8),
-    avg_latency_ms: parseFloat((jitter(42, 12) / 1).toFixed(1)),
-    error_count: jitter(1195 + Math.floor(mockCounter * 0.3), 10),
-    db_status: dbOk ? 'healthy' : 'degraded',
-    redis_status: redisOk ? 'healthy' : (mockCounter % 2 ? 'degraded' : 'down'),
-    uptime_seconds: 86400 + mockCounter * 5,
-    requests_per_minute: jitter(420, 40),
-    recent_errors: [
-      {
-        timestamp: new Date(Date.now() - Math.random() * 600000).toISOString(),
-        endpoint: errorEndpoints[Math.floor(Math.random() * errorEndpoints.length)],
-        status_code: [429, 401, 500, 422, 503][Math.floor(Math.random() * 5)],
-        message: errorMessages[Math.floor(Math.random() * errorMessages.length)],
-      },
-      {
-        timestamp: new Date(Date.now() - Math.random() * 1200000).toISOString(),
-        endpoint: errorEndpoints[Math.floor(Math.random() * errorEndpoints.length)],
-        status_code: [429, 401, 500, 422, 503][Math.floor(Math.random() * 5)],
-        message: errorMessages[Math.floor(Math.random() * errorMessages.length)],
-      },
-      {
-        timestamp: new Date(Date.now() - Math.random() * 1800000).toISOString(),
-        endpoint: errorEndpoints[Math.floor(Math.random() * errorEndpoints.length)],
-        status_code: [429, 401, 500, 422, 503][Math.floor(Math.random() * 5)],
-        message: errorMessages[Math.floor(Math.random() * errorMessages.length)],
-      },
-    ],
-  };
-}
+// ─── Real data from /metrics endpoint ───
 
 // ─── Status indicator helpers ───
 

@@ -9,6 +9,9 @@ import { ProfilePage } from './pages/ProfilePage';
 import { SubscriptionsPage } from './pages/SubscriptionsPage';
 import { VouchersPage } from './pages/VouchersPage';
 import { PaymentsPage } from './pages/PaymentsPage';
+import { AnalyticsPage } from './pages/AnalyticsPage';
+import { MonitorPage } from './pages/MonitorPage';
+import { AuditLogsPage } from './pages/AuditLogsPage';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -42,6 +45,9 @@ const App = () => (
           <Route path="subscriptions" element={<SubscriptionsPage />} />
           <Route path="vouchers" element={<VouchersPage />} />
           <Route path="payments" element={<PaymentsPage />} />
+          <Route path="analytics" element={<AnalyticsPage />} />
+          <Route path="monitor" element={<MonitorPage />} />
+          <Route path="audit-logs" element={<AuditLogsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/admin" />} />
       </Routes>

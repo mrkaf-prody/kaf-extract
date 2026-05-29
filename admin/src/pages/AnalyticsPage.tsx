@@ -125,10 +125,29 @@ export const AnalyticsPage: React.FC = () => {
   const fetchAnalytics = useCallback(async (r: TimeRange) => {
     setLoading(true);
     try {
-      // TODO: Replace with real API: const data = await apiFetch(`/v1/admin/analytics?range=${r}`);
-      // Simulate network delay
-      await new Promise((resolve) => setTimeout(resolve, 600));
-      const data = generateMockAnalytics(r);
+      const raw = await apiFetch(`/api/v1/admin/analytics?range=${r}`);
+      // Map backend fields to frontend schema
+      const data: AnalyticsData = {
+        mrr: (raw.mrr_cents || 0) / 100,
+        arpu: (raw.arpu_cents || 0) / 100,
+        churn_rate: raw.churn_rate_percent || 0,
+        trial_conversion: 0, // not tracked yet
+        total_customers: raw.total_users || 0,
+        revenue_this_month: (raw.mrr_cents || 0) / 100,
+        mrr_over_time: (raw.signups_per_day || []).map((d: any) => ({
+          date: new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          mrr: d.count * 10, // proxy until we have real MRR series
+        })),
+        revenue_by_plan: (raw.revenue_by_plan || []).map((p: any) => ({
+          name: p.plan.charAt(0).toUpperCase() + p.plan.slice(1),
+          value: (p.mrr || 0) / 100,
+          color: p.plan === 'hobby' ? '#3b82f6' : p.plan === 'pro' ? '#8b5cf6' : p.plan === 'enterprise' ? '#f59e0b' : '#64748b',
+        })),
+        signups_per_day: (raw.signups_per_day || []).map((d: any) => ({
+          date: new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          signups: d.count || 0,
+        })),
+      };
       setAnalytics(data);
       setError(null);
     } catch (err: any) {
@@ -136,7 +155,7 @@ export const AnalyticsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [apiFetch]);
 
   useEffect(() => {
     fetchAnalytics(range);

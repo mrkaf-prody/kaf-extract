@@ -224,12 +224,25 @@ export const AuditLogsPage: React.FC = () => {
       if (dateFrom) params.set('from', dateFrom);
       if (dateTo) params.set('to', dateTo);
 
-      // TODO: Replace with real API:
-      // const result = await apiFetch(`/v1/admin/logs?${params.toString()}`);
-      // Simulate network delay
-      await new Promise((r) => setTimeout(r, 500));
-      const result = generateMockLogs(page, limit, actionFilter, adminSearch);
-      setData(result);
+        const result = await apiFetch(`/api/v1/admin/logs?${params.toString()}`);
+      // Map backend format to frontend format
+      const mapped: PaginatedResponse = {
+        items: (result.items || []).map((item: any) => ({
+          id: item.id,
+          timestamp: item.created_at || item.timestamp,
+          admin_email: item.admin_email || 'unknown',
+          action: item.action,
+          target_type: item.target_type,
+          target_id: item.target_id,
+          details: item.details || '',
+          ip_address: item.ip_address || '-',
+        })),
+        total: result.total || 0,
+        page: page,
+        limit: limit,
+        total_pages: Math.ceil((result.total || 0) / limit),
+      };
+      setData(mapped);
       setError(null);
     } catch (err: any) {
       setError(err.message || 'Failed to load audit logs');

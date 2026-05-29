@@ -3,7 +3,8 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
   LayoutDashboard, Users, CreditCard, Settings, Ticket,
-  LogOut, User, ChevronLeft, ChevronRight, Shield
+  LogOut, User, ChevronLeft, ChevronRight, Shield,
+  BarChart3, Activity, FileText,
 } from 'lucide-react';
 
 const KafLogo: React.FC<{ size?: number }> = ({ size = 20 }) => (
@@ -17,10 +18,13 @@ const KafLogo: React.FC<{ size?: number }> = ({ size = 20 }) => (
 const navItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'Overview', end: true },
   { to: '/admin/users', icon: Users, label: 'Users' },
-  { to: '/admin/profile', icon: User, label: 'Profile' },
+  { to: '/admin/analytics', icon: BarChart3, label: 'Analytics' },
+  { to: '/admin/monitor', icon: Activity, label: 'Monitor' },
+  { to: '/admin/audit-logs', icon: FileText, label: 'Audit Logs' },
   { to: '/admin/subscriptions', icon: CreditCard, label: 'Subscriptions' },
   { to: '/admin/vouchers', icon: Ticket, label: 'Vouchers' },
   { to: '/admin/payments', icon: Settings, label: 'Payments' },
+  { to: '/admin/profile', icon: User, label: 'Profile' },
 ];
 
 export const AdminLayout: React.FC = () => {
