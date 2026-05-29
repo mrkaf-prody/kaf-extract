@@ -11,13 +11,13 @@ interface Subscription {
   id: string;
   user_email: string;
   user_name: string;
-  plan: 'free' | 'starter' | 'pro' | 'enterprise';
-  status: 'active' | 'cancelled' | 'expired' | 'past_due';
+  plan: 'hobby' | 'pro' | 'enterprise';
+  status: 'active' | 'canceled' | 'expired' | 'past_due';
   started_at: string;
   expires_at: string;
 }
 
-const PLANS = ['free', 'starter', 'pro', 'enterprise'] as const;
+const PLANS = ['hobby', 'pro', 'enterprise'] as const;
 
 // ─── Data loaded from /api/v1/admin/subscriptions ───
 
@@ -36,7 +36,7 @@ const planBadge = (plan: Subscription['plan']) => {
 const statusBadge = (status: Subscription['status']) => {
   const map: Record<string, string> = {
     active: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-    cancelled: 'bg-red-500/10 text-red-400 border-red-500/30',
+    canceled: 'bg-red-500/10 text-red-400 border-red-500/30',
     expired: 'bg-slate-500/10 text-slate-400 border-slate-500/30',
     past_due: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
   };
@@ -96,7 +96,7 @@ export const SubscriptionsPage: React.FC = () => {
         if (search) params.append('search', search);
         if (statusFilter !== 'all') params.append('status', statusFilter);
         if (planFilter !== 'all') params.append('plan', planFilter);
-        const res = await apiFetch(`/v1/admin/subscriptions?${params.toString()}`);
+        const res = await apiFetch(`/api/v1/admin/subscriptions?${params.toString()}`);
         setSubscriptions(res);
       } catch (e: any) {
         setError(e.message);
@@ -105,7 +105,7 @@ export const SubscriptionsPage: React.FC = () => {
       }
     };
     fetchData();
-  }, [search, statusFilter, planFilter]);
+  }, [search, statusFilter, planFilter, apiFetch]);
 
   // Derived
   const filtered = useMemo(() => {
@@ -120,21 +120,32 @@ export const SubscriptionsPage: React.FC = () => {
   }, [subscriptions, search, statusFilter, planFilter]);
 
   // Change plan
-  const handleChangePlan = useCallback((subId: string, newPlan: string) => {
-    setSubscriptions((prev) =>
-      prev.map((s) => (s.id === subId ? { ...s, plan: newPlan as Subscription['plan'] } : s))
-    );
-    // TODO: apiFetch(`/v1/admin/subscriptions/${subId}`, { method: 'PATCH', body: JSON.stringify({ plan: newPlan }) });
-  }, []);
+  const handleChangePlan = useCallback(async (subId: string, newPlan: string) => {
+    try {
+      await apiFetch(`/api/v1/admin/subscriptions/${subId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ plan: newPlan }),
+      });
+      setSubscriptions((prev) =>
+        prev.map((s) => (s.id === subId ? { ...s, plan: newPlan as Subscription['plan'] } : s))
+      );
+    } catch (e: any) {
+      setError(e.message || 'Failed to change plan');
+    }
+  }, [apiFetch]);
 
   // Cancel
-  const handleCancel = useCallback((subId: string) => {
-    setSubscriptions((prev) =>
-      prev.map((s) => (s.id === subId ? { ...s, status: 'cancelled' as const } : s))
-    );
+  const handleCancel = useCallback(async (subId: string) => {
+    try {
+      await apiFetch(`/api/v1/admin/subscriptions/${subId}/cancel`, { method: 'POST' });
+      setSubscriptions((prev) =>
+        prev.map((s) => (s.id === subId ? { ...s, status: 'canceled' as const } : s))
+      );
+    } catch (e: any) {
+      setError(e.message || 'Failed to cancel subscription');
+    }
     setConfirmCancel(null);
-    // TODO: apiFetch(`/v1/admin/subscriptions/${subId}/cancel`, { method: 'POST' });
-  }, []);
+  }, [apiFetch]);
 
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -194,7 +205,7 @@ export const SubscriptionsPage: React.FC = () => {
             if (statusFilter !== 'all') params.append('status', statusFilter);
             if (planFilter !== 'all') params.append('plan', planFilter);
             setLoading(true);
-            apiFetch(`/v1/admin/subscriptions?${params.toString()}`)
+            apiFetch(`/api/v1/admin/subscriptions?${params.toString()}`)
               .then((data: any) => {
                 setSubscriptions(data);
               })
@@ -268,7 +279,7 @@ export const SubscriptionsPage: React.FC = () => {
                                 onClick={() => handleChangePlan(s.id, p)}
                                 className="block w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-700 hover:text-white transition-colors first:rounded-t-lg last:rounded-b-lg"
                               >
-                                {p === 'free' ? <ArrowDownCircle size={12} className="inline mr-1" /> : <ArrowUpCircle size={12} className="inline mr-1" />}
+                                {p === 'hobby' ? <ArrowDownCircle size={12} className="inline mr-1" /> : <ArrowUpCircle size={12} className="inline mr-1" />}
                                 {p.charAt(0).toUpperCase() + p.slice(1)}
                               </button>
                             ))}

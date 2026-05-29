@@ -25,7 +25,7 @@ interface AnalyticsData {
   signups_per_day: { date: string; signups: number }[];
 }
 
-// ─── Mock data generators ───
+// ─── Mock data generators (REMOVE after confirming API works) ───
 
 function generateMRRData(range: TimeRange): { date: string; mrr: number }[] {
   const days = range === '7d' ? 7 : range === '30d' ? 30 : 90;
