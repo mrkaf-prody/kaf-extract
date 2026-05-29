@@ -19,7 +19,7 @@ interface ExtractRecord {
 }
 
 export const UsagePage: React.FC = () => {
-  const { apiFetch } = useAuth();
+  const { apiFetch, showError } = useAuth();
   const [usage, setUsage] = useState<UsageStats | null>(null);
   const [recent, setRecent] = useState<ExtractRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,7 +34,7 @@ export const UsagePage: React.FC = () => {
         setUsage(u);
         setRecent(h.extractions || h || []);
       })
-      .catch(() => {})
+      .catch((err: any) => showError(err.message || 'Failed to load usage data'))
       .finally(() => setLoading(false));
   }, [apiFetch]);
 

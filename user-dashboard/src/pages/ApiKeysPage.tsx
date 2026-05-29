@@ -15,7 +15,7 @@ interface KeyItem {
 }
 
 export const ApiKeysPage: React.FC = () => {
-  const { apiFetch } = useAuth();
+  const { apiFetch, showError } = useAuth();
   const [keys, setKeys] = useState<KeyItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -23,49 +23,32 @@ export const ApiKeysPage: React.FC = () => {
   const [creating, setCreating] = useState(false);
   const [newKeyRaw, setNewKeyRaw] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
-  const [error, setError] = useState('');
 
   const fetchKeys = useCallback(() => {
     setLoading(true);
     apiFetch('/api/v1/keys')
       .then(data => setKeys(Array.isArray(data) ? data : data.keys || []))
-      .catch(() => {})
+      .catch((err: any) => showError(err.message || 'Failed to load API keys'))
       .finally(() => setLoading(false));
-  }, [apiFetch]);
+  }, [apiFetch, showError]);
 
   useEffect(() => { fetchKeys(); }, [fetchKeys]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newLabel.trim()) return;
-    setError('');
     setCreating(true);
     try {
-      // User keys are created via admin endpoint for now; the API expects admin role
-      // but we try the user-facing POST /api/v1/keys
       const res = await apiFetch('/api/v1/keys', {
         method: 'POST',
         body: JSON.stringify({ label: newLabel.trim() }),
       });
-      // The API returns the raw key only on creation. Let's also try the admin endpoint
       setNewKeyRaw(res.api_key || '');
       setNewLabel('');
       setShowCreate(false);
       fetchKeys();
     } catch (err: any) {
-      // Fallback: try creating via alternative path if the user endpoint doesn't support POST
-      try {
-        const alt = await apiFetch('/api/v1/admin/keys', {
-          method: 'POST',
-          body: JSON.stringify({ label: newLabel.trim() }),
-        });
-        setNewKeyRaw(alt.api_key || '');
-        setNewLabel('');
-        setShowCreate(false);
-        fetchKeys();
-      } catch (e2: any) {
-        setError(e2.message || 'Failed to create key');
-      }
+      showError(err.message || 'Failed to create key');
     } finally {
       setCreating(false);
     }
@@ -74,10 +57,10 @@ export const ApiKeysPage: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to revoke this API key?')) return;
     try {
-      await apiFetch(`/api/v1/admin/keys/${id}`, { method: 'DELETE' });
+      await apiFetch(`/api/v1/keys/${id}`, { method: 'DELETE' });
       fetchKeys();
     } catch (err: any) {
-      setError(err.message || 'Failed to delete key');
+      showError(err.message || 'Failed to delete key');
     }
   };
 
@@ -95,19 +78,13 @@ export const ApiKeysPage: React.FC = () => {
           <p className="text-slate-400 text-sm">Manage your API keys for programmatic access.</p>
         </div>
         <button
-          onClick={() => { setShowCreate(true); setNewKeyRaw(null); setError(''); }}
+          onClick={() => { setShowCreate(true); setNewKeyRaw(null); }}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded px-4 py-2 text-sm font-medium transition-colors"
         >
           <Plus size={16} />
           Create Key
         </button>
       </div>
-
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded p-3 text-sm text-red-400 mb-4">
-          {error}
-        </div>
-      )}
 
       {/* New key raw display */}
       {newKeyRaw && (

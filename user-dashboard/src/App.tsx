@@ -8,6 +8,7 @@ import { OverviewPage } from './pages/OverviewPage';
 import { ApiKeysPage } from './pages/ApiKeysPage';
 import { UsagePage } from './pages/UsagePage';
 import { BillingPage } from './pages/BillingPage';
+import { ProfilePage } from './pages/ProfilePage';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -40,6 +41,7 @@ const App = () => (
           <Route index element={<OverviewPage />} />
           <Route path="keys" element={<ApiKeysPage />} />
           <Route path="usage" element={<UsagePage />} />
+          <Route path="profile" element={<ProfilePage />} />
           <Route path="billing" element={<BillingPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" />} />

@@ -26,7 +26,7 @@ interface ExtractRecord {
 }
 
 export const OverviewPage = () => {
-  const { user, apiFetch } = useAuth();
+  const { user, apiFetch, showError } = useAuth();
   const [usage, setUsage] = useState<UsageStats | null>(null);
   const [keys, setKeys] = useState<KeyItem[]>([]);
   const [recent, setRecent] = useState<ExtractRecord[]>([]);
@@ -39,7 +39,10 @@ export const OverviewPage = () => {
         const [u, kData, h] = await Promise.all([
           apiFetch('/api/v1/usage'),
           apiFetch('/api/v1/keys'),
-          apiFetch('/api/v1/extract/history?limit=5').catch(() => null),
+          apiFetch('/api/v1/extract/history?limit=5').catch((err: any) => {
+            showError(err.message || 'Failed to load history');
+            return null;
+          }),
         ]);
         if (cancelled) return;
         console.log('Usage:', u);

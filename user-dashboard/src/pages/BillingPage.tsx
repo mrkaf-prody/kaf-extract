@@ -36,7 +36,7 @@ interface SubscriptionStatus {
 }
 
 export const BillingPage: React.FC = () => {
-  const { apiFetch } = useAuth();
+  const { apiFetch, showError } = useAuth();
   const [data, setData] = useState<SubscriptionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -46,7 +46,7 @@ export const BillingPage: React.FC = () => {
     setLoading(true);
     apiFetch('/api/v1/subscriptions/me')
       .then(d => setData(d))
-      .catch(() => {})
+      .catch((err: any) => showError(err.message || 'Failed to load billing info'))
       .finally(() => setLoading(false));
   }, [apiFetch]);
 

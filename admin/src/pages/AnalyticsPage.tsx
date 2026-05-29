@@ -295,7 +295,7 @@ export const AnalyticsPage: React.FC = () => {
                       borderRadius: '8px',
                       color: '#e2e8f0',
                     }}
-                    formatter={(value: number) => [formatCurrency(value), 'MRR']}
+                    formatter={(value: any) => [formatCurrency(value), 'MRR']}
                   />
                   <Area
                     type="monotone"
@@ -338,7 +338,7 @@ export const AnalyticsPage: React.FC = () => {
                       borderRadius: '8px',
                       color: '#e2e8f0',
                     }}
-                    formatter={(value: number) => [formatCurrency(value), 'Revenue']}
+                    formatter={(value: any) => [formatCurrency(value), 'Revenue']}
                   />
                 </RePieChart>
               </ResponsiveContainer>
@@ -378,7 +378,7 @@ export const AnalyticsPage: React.FC = () => {
                     borderRadius: '8px',
                     color: '#e2e8f0',
                   }}
-                  formatter={(value: number) => [value, 'Signups']}
+                  formatter={(value: any) => [value, 'Signups']}
                 />
                 <Bar dataKey="signups" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Signups" />
               </BarChart>

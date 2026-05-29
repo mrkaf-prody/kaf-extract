@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 
 interface User {
   id: string;
@@ -9,6 +9,12 @@ interface User {
   created_at: string;
 }
 
+interface Toast {
+  id: number;
+  type: 'error' | 'success';
+  message: string;
+}
+
 interface AuthCtx {
   user: User | null;
   token: string | null;
@@ -16,6 +22,8 @@ interface AuthCtx {
   logout: () => void;
   loading: boolean;
   apiFetch: (path: string, opts?: RequestInit) => Promise<any>;
+  showError: (msg: string) => void;
+  showSuccess: (msg: string) => void;
 }
 
 const AuthContext = createContext<AuthCtx>(null!);
@@ -27,6 +35,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(localStorage.getItem('access_token'));
   const [loading, setLoading] = useState(true);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const toastIdRef = useRef(0);
+
+  const showError = useCallback((msg: string) => {
+    const id = ++toastIdRef.current;
+    setToasts(prev => [...prev, { id, type: 'error', message: msg }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  }, []);
+
+  const showSuccess = useCallback((msg: string) => {
+    const id = ++toastIdRef.current;
+    setToasts(prev => [...prev, { id, type: 'success', message: msg }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  }, []);
 
   const fetchMe = useCallback(async (t: string) => {
     try {
@@ -96,8 +122,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading, apiFetch }}>
+    <AuthContext.Provider value={{ user, token, login, logout, loading, apiFetch, showError, showSuccess }}>
       {children}
+      {/* Toast container */}
+      <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">
+        {toasts.map(t => (
+          <div
+            key={t.id}
+            className={`pointer-events-auto max-w-sm rounded-lg px-4 py-3 shadow-lg text-sm font-medium transition-all
+              ${t.type === 'error'
+                ? 'bg-red-900/90 border border-red-700 text-red-100'
+                : 'bg-emerald-900/90 border border-emerald-700 text-emerald-100'
+              }`}
+          >
+            {t.message}
+          </div>
+        ))}
+      </div>
     </AuthContext.Provider>
   );
 };
