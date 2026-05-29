@@ -9,19 +9,21 @@ import { ApiKeysPage } from './pages/ApiKeysPage';
 import { UsagePage } from './pages/UsagePage';
 import { BillingPage } from './pages/BillingPage';
 
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-  if (loading)
+  if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen text-slate-400 bg-slate-950">
+      <div className="flex items-center justify-center h-screen text-[#9a9aae] bg-[#06060a]">
+        <div className="w-8 h-8 border-2 border-[#00d4a0] border-t-transparent rounded-full animate-spin mr-3"></div>
         Loading...
       </div>
     );
-    if (!user) return <Navigate to="/dashboard/login" />;
+  }
+  if (!user) return <Navigate to="/dashboard/login" />;
   return <>{children}</>;
 };
 
-const App: React.FC = () => (
+const App = () => (
   <BrowserRouter>
     <AuthProvider>
       <Routes>

@@ -1,12 +1,80 @@
 @import "tailwindcss";
 
 :root {
+  --bg-deep: #06060a;
+  --bg-panel: #0a0a12;
+  --bg-card: #0f0f18;
+  --bg-elev: #14141f;
+  --border: #1c1c2a;
+  --border-subtle: #12121a;
+  --text-primary: #f0f0f5;
+  --text-secondary: #9a9aae;
+  --text-muted: #5c5c70;
+  --accent: #00d4a0;
+  --accent-soft: rgba(0,212,160,0.08);
+  --accent-glow: rgba(0,212,160,0.4);
+  --brand-blue: #4494ff;
+  --brand-blue-soft: rgba(68,148,255,0.08);
+  --code: #b8b8c8;
+  --red: #ff5f56;
+  --yellow: #ffbd2e;
+  --green-dot: #27ca40;
   --sidebar-width: 240px;
 }
 
 body {
   margin: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  background: #0f172a;
-  color: #e2e8f0;
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
 }
+
+/* Mesh gradient animated background for auth pages */
+.mesh-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  background: var(--bg-deep);
+}
+.mesh-bg::before,
+.mesh-bg::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.35;
+  animation: meshFloat 12s ease-in-out infinite alternate;
+}
+.mesh-bg::before {
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, #00d4a0 0%, transparent 70%);
+  top: -10%; right: -10%;
+  animation-delay: -4s;
+}
+.mesh-bg::after {
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, #4494ff 0%, transparent 70%);
+  bottom: -10%; left: -10%;
+  animation-delay: -8s;
+}
+@keyframes meshFloat {
+  0%   { transform: translate(0, 0) scale(1); }
+  33%  { transform: translate(30px, -20px) scale(1.05); }
+  66%  { transform: translate(-20px, 30px) scale(0.95); }
+  100% { transform: translate(20px, 20px) scale(1.02); }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-deep); }
+::-webkit-scrollbar-thumb { background: #1c1c2a; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #2c2c3a; }
+
+/* Animations */
+@keyframes reveal {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-reveal { animation: reveal .7s cubic-bezier(.22,1,.36,1) forwards; }
