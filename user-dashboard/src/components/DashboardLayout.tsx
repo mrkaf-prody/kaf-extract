@@ -1,5 +1,4 @@
-import React from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { LayoutDashboard, Key, BarChart3, CreditCard, LogOut, Zap, User } from 'lucide-react';
 
@@ -12,7 +11,6 @@ const navItems = [
 
 export const DashboardLayout = () => {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
   return (
     <div className="flex h-screen bg-[#06060a]">
       {/* Sidebar */}
