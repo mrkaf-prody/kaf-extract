@@ -1,5 +1,7 @@
 """Auth router — user registration, login, token refresh, 2FA."""
 
+from __future__ import annotations
+
 import os
 import uuid
 from datetime import UTC, datetime, timedelta
