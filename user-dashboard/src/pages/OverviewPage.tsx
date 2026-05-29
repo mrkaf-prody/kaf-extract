@@ -51,7 +51,10 @@ export const OverviewPage = () => {
         setUsage(u);
         const arr = Array.isArray(kData) ? kData : kData.keys || [];
         setKeys(arr);
-        setRecent(h?.extractions || h || []);
+        const recentList = Array.isArray(h)
+          ? h
+          : h?.history || h?.extractions || [];
+        setRecent(recentList);
       } catch (e) {
         console.error('Overview load error:', e);
       } finally {

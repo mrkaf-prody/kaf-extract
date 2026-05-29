@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Zap, LogIn, Loader2, Eye, EyeOff, Copy, Check, AlertCircle } from 'lucide-react';
 
 export const RegisterPage = () => {
-  const { login } = useAuth();
+  const { initSession } = useAuth();
   const navigate = useNavigate();
 
   // Step 1: Registration form
@@ -42,10 +42,8 @@ export const RegisterPage = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Registration failed');
 
-      // Store tokens then log in via AuthContext
-      localStorage.setItem('access_token', data.access_token);
-      localStorage.setItem('refresh_token', data.refresh_token);
-      await login(email, password); // This will fetch /auth/me and set user state
+      // Initialize session directly (tokens already available from registration)
+      await initSession(data.access_token);
 
       // Now user is logged in — fetch 2FA setup
       const setupRes = await fetch(`${API_BASE}/auth/2fa/setup`, {

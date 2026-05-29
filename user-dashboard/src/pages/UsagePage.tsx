@@ -32,7 +32,10 @@ export const UsagePage: React.FC = () => {
     ])
       .then(([u, h]) => {
         setUsage(u);
-        setRecent(h.extractions || h || []);
+        const recentList = Array.isArray(h)
+          ? h
+          : h?.history || h?.extractions || [];
+        setRecent(recentList);
       })
       .catch((err: any) => showError(err.message || 'Failed to load usage data'))
       .finally(() => setLoading(false));

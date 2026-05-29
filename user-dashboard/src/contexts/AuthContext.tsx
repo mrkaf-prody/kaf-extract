@@ -24,6 +24,7 @@ interface AuthCtx {
   apiFetch: (path: string, opts?: RequestInit) => Promise<any>;
   showError: (msg: string) => void;
   showSuccess: (msg: string) => void;
+  initSession: (accessToken: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthCtx>(null!);
@@ -96,6 +97,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await fetchMe(data.access_token);
   };
 
+  const initSession = async (accessToken: string) => {
+    localStorage.setItem('access_token', accessToken);
+    setToken(accessToken);
+    await fetchMe(accessToken);
+  };
+
   const logout = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
@@ -122,7 +129,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading, apiFetch, showError, showSuccess }}>
+    <AuthContext.Provider value={{ user, token, login, logout, loading, apiFetch, showError, showSuccess, initSession }}>
       {children}
       {/* Toast container */}
       <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">
