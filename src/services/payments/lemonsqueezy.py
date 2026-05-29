@@ -56,7 +56,10 @@ class LemonSqueezyProvider(PaymentProvider):
         self._api_key = settings.lemonsqueezy_api_key
         self._store_id = settings.lemonsqueezy_store_id
         self._webhook_secret = settings.lemonsqueezy_webhook_secret
-        self._test_mode = settings.lemonsqueezy_test_mode
+
+    @property
+    def _test_mode(self) -> bool:
+        return settings.lemonsqueezy_test_mode
 
     # ------------------------------------------------------------------
     # Helpers
@@ -94,6 +97,7 @@ class LemonSqueezyProvider(PaymentProvider):
         name: str = "",
         success_url: str = "",
         cancel_url: str = "",
+        test_mode: bool | None = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """Create a LemonSqueezy checkout for the given plan.
@@ -137,7 +141,8 @@ class LemonSqueezyProvider(PaymentProvider):
         if cancel_url:
             checkout_data["attributes"]["checkout_data"]["cancel_url"] = cancel_url
 
-        if self._test_mode:
+        is_test = test_mode if test_mode is not None else self._test_mode
+        if is_test:
             checkout_data["attributes"]["test_mode"] = True
 
         async with httpx.AsyncClient(timeout=30) as client:

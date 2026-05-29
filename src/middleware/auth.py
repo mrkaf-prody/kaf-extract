@@ -103,12 +103,24 @@ async def get_current_user(
 
 async def admin_required(
     current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """Dependency: require admin role."""
+    """Dependency: require admin role and enforce 2FA for admin users."""
     if current_user.get("role") != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required",
+        )
+    # Enforce 2FA for admins
+    from src.models.sql_models import User
+    result = await db.execute(
+        select(User).where(User.id == current_user["user_id"])
+    )
+    user = result.scalar_one_or_none()
+    if not user or not user.totp_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access requires 2FA to be enabled.",
         )
     return current_user
 

@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     lemonsqueezy_api_key: str = ""
     lemonsqueezy_store_id: str = ""
     lemonsqueezy_webhook_secret: str = ""
-    lemonsqueezy_test_mode: bool = True
+    lemonsqueezy_test_mode: bool = os.environ.get("PAYMENT_TEST_MODE", "true").lower() == "true"
 
     # LemonSqueezy variant IDs (one per plan)
     lemonsqueezy_variant_hobby: str = ""

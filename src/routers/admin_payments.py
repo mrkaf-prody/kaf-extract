@@ -79,7 +79,7 @@ async def get_payment_config(
 
     return PaymentConfigResponse(
         active_provider=settings.payment_provider,
-        test_mode=os.getenv("PAYMENT_TEST_MODE", "false").lower() == "true",
+        test_mode=settings.lemonsqueezy_test_mode,
         providers=providers,
     )
 
@@ -101,6 +101,10 @@ async def update_payment_config(
 
     if body.test_mode is not None:
         os.environ["PAYMENT_TEST_MODE"] = str(body.test_mode).lower()
+        # Update runtime settings so provider singletons see the change
+        from src.config import settings
+        settings.lemonsqueezy_test_mode = body.test_mode
+        settings.paddle_test_mode = body.test_mode
 
     if body.providers is not None:
         for key, cfg in body.providers.items():

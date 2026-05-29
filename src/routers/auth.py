@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import base64
+import json
 import os
 import uuid
 from datetime import UTC, datetime, timedelta
+from io import BytesIO
 
 import pyotp
+import qrcode
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr, Field
@@ -23,6 +27,12 @@ from src.middleware.auth import (
     get_current_user,
 )
 from src.models.sql_models import RefreshToken, User
+from src.utils.crypto import (
+    decrypt_totp_secret,
+    encrypt_totp_secret,
+    generate_backup_codes,
+    verify_backup_code,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -79,10 +89,21 @@ class MessageResponse(BaseModel):
 class TOTPSetupResponse(BaseModel):
     secret: str
     qr_code_uri: str
+    qr_code_data_uri: str
 
 
 class TOTPVerifyRequest(BaseModel):
     secret: str
+    code: str = Field(..., min_length=6, max_length=6)
+
+
+class TOTPVerifyResponse(BaseModel):
+    message: str
+    backup_codes: list[str]
+
+
+class TOTPDisableRequest(BaseModel):
+    password: str
     code: str = Field(..., min_length=6, max_length=6)
 
 
@@ -131,7 +152,7 @@ async def _create_token_response(
             name=user.name,
             role=user.role,
             status=user.status,
-            totp_enabled=bool(user.totp_secret),
+            totp_enabled=user.totp_enabled,
             created_at=user.created_at.isoformat() if user.created_at else "",
         ),
     )
@@ -280,7 +301,7 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
         )
 
     # If user has 2FA enabled, issue a challenge instead of tokens
-    if user.totp_secret:
+    if user.totp_enabled:
         return LoginChallenge()
 
     return await _create_token_response(db, user)
@@ -319,7 +340,7 @@ async def me(current_user: dict = Depends(get_current_user), db: AsyncSession = 
         name=user.name,
         role=user.role,
         status=user.status,
-        totp_enabled=bool(user.totp_secret),
+            totp_enabled=user.totp_enabled,
         created_at=user.created_at.isoformat() if user.created_at else "",
     )
 
@@ -376,12 +397,33 @@ async def update_profile(
         name=user.name,
         role=user.role,
         status=user.status,
-        totp_enabled=bool(user.totp_secret),
+            totp_enabled=user.totp_enabled,
         created_at=user.created_at.isoformat() if user.created_at else "",
     )
 
 
 # --- 2FA Endpoints ---
+
+
+class TOTPSetupResponse(BaseModel):
+    secret: str
+    qr_code_uri: str
+    qr_code_data_uri: str
+
+
+class TOTPVerifyRequest(BaseModel):
+    secret: str
+    code: str = Field(..., min_length=6, max_length=6)
+
+
+class TOTPVerifyResponse(BaseModel):
+    message: str
+    backup_codes: list[str]
+
+
+class TOTPDisableRequest(BaseModel):
+    password: str
+    code: str = Field(..., min_length=6, max_length=6)
 
 
 @router.post("/2fa/setup", response_model=TOTPSetupResponse)
@@ -390,7 +432,7 @@ async def setup_2fa(
     db: AsyncSession = Depends(get_db),
 ):
     """Generate TOTP secret and QR code URI for setup.
-    
+
     The secret is NOT saved yet — user must verify via /auth/2fa/verify first.
     """
     result = await db.execute(
@@ -400,7 +442,7 @@ async def setup_2fa(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    if user.totp_secret:
+    if user.totp_enabled or user.totp_secret:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="2FA is already configured. Disable it first to reconfigure.",
@@ -414,13 +456,23 @@ async def setup_2fa(
         issuer_name="Kaf Extract",
     )
 
+    # Generate QR code image as data URI
+    qr = qrcode.make(qr_uri)
+    from io import BytesIO
+    buffer = BytesIO()
+    qr.save(buffer, format="PNG")
+    qr_data = base64.b64encode(buffer.getvalue()).decode()
+    qr_data_uri = f"data:image/png;base64,{qr_data}"
+
+    # Return the secret so the user can confirm with /auth/2fa/verify
     return TOTPSetupResponse(
         secret=secret,
         qr_code_uri=qr_uri,
+        qr_code_data_uri=qr_data_uri,
     )
 
 
-@router.post("/2fa/verify", response_model=MessageResponse)
+@router.post("/2fa/verify", response_model=TOTPVerifyResponse)
 async def verify_2fa(
     body: TOTPVerifyRequest,
     current_user: dict = Depends(get_current_user),
@@ -428,8 +480,7 @@ async def verify_2fa(
 ):
     """Verify a TOTP code and save the secret (completes 2FA setup).
 
-    The secret must have been generated via /auth/2fa/setup.
-    Send both 'secret' and 'code' in the request body.
+    Returns backup codes on success. Store them securely — they are shown once.
     """
     result = await db.execute(
         select(User).where(User.id == current_user["user_id"])
@@ -438,7 +489,7 @@ async def verify_2fa(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    if user.totp_secret:
+    if user.totp_enabled or user.totp_secret:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="2FA is already configured.",
@@ -446,21 +497,74 @@ async def verify_2fa(
 
     # Verify the TOTP code
     totp = pyotp.TOTP(body.secret)
-    if not totp.verify(body.code):
+    if not totp.verify(body.code, valid_window=1):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid TOTP code. Please try again.",
         )
 
-    # Save the secret — 2FA is now active
-    user.totp_secret = body.secret
+    # Generate backup codes
+    plain_codes, hashed_codes = generate_backup_codes(count=8)
+
+    # Save encrypted secret + backup codes
+    user.totp_secret = encrypt_totp_secret(body.secret)
+    user.totp_enabled = True
+    user.backup_codes = json.dumps(hashed_codes)
     await db.flush()
 
-    return MessageResponse(message="2FA has been enabled successfully.")
+    return TOTPVerifyResponse(
+        message="2FA has been enabled successfully.",
+        backup_codes=plain_codes,
+    )
 
 
-@router.post("/2fa/login", response_model=TokenResponse)
-async def login_2fa(
+@router.post("/2fa/disable", response_model=MessageResponse)
+async def disable_2fa(
+    body: TOTPDisableRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Disable 2FA after verifying password + current TOTP code."""
+    result = await db.execute(
+        select(User).where(User.id == current_user["user_id"])
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if not user.totp_enabled or not user.totp_secret:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="2FA is not enabled for this account.",
+        )
+
+    # Verify password
+    if not _verify_password(body.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Current password is incorrect",
+        )
+
+    # Verify TOTP code
+    decrypted_secret = decrypt_totp_secret(user.totp_secret)
+    totp = pyotp.TOTP(decrypted_secret)
+    if not totp.verify(body.code, valid_window=1):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid TOTP code.",
+        )
+
+    # Clear 2FA state
+    user.totp_secret = None
+    user.totp_enabled = False
+    user.backup_codes = None
+    await db.flush()
+
+    return MessageResponse(message="2FA has been disabled successfully.")
+
+
+@router.post("/2fa/authenticate", response_model=TokenResponse)
+async def authenticate_2fa(
     body: TOTPLoginRequest,
     db: AsyncSession = Depends(get_db),
 ):
@@ -484,18 +588,37 @@ async def login_2fa(
             detail="Account is suspended",
         )
 
-    if not user.totp_secret:
+    if not user.totp_enabled or not user.totp_secret:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="2FA is not enabled for this account. Use /auth/login instead.",
         )
 
-    # Verify TOTP code
-    totp = pyotp.TOTP(user.totp_secret)
-    if not totp.verify(body.totp_code):
+    # Verify TOTP code (or backup code)
+    decrypted_secret = decrypt_totp_secret(user.totp_secret)
+    totp = pyotp.TOTP(decrypted_secret)
+    valid = totp.verify(body.totp_code, valid_window=1)
+
+    # If TOTP invalid, try backup codes
+    if not valid and user.backup_codes:
+        backup_hashes = json.loads(user.backup_codes)
+        if verify_backup_code(body.totp_code, backup_hashes):
+            valid = True
+            # Remove used backup code
+            used_hash = None
+            for h in backup_hashes:
+                import hashlib
+                if hashlib.sha256(body.totp_code.upper().encode()).hexdigest() == h:
+                    used_hash = h
+                    break
+            if used_hash:
+                backup_hashes.remove(used_hash)
+                user.backup_codes = json.dumps(backup_hashes) if backup_hashes else None
+
+    if not valid:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid TOTP code.",
+            detail="Invalid TOTP code or backup code.",
         )
 
     return await _create_token_response(db, user)

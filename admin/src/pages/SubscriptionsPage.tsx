@@ -19,18 +19,7 @@ interface Subscription {
 
 const PLANS = ['free', 'starter', 'pro', 'enterprise'] as const;
 
-// ─── Mock Data (replace with GET /api/v1/admin/subscriptions) ───
-
-const MOCK_SUBSCRIPTIONS: Subscription[] = [
-  { id: 's1', user_email: 'alice@example.com', user_name: 'Alice Johnson', plan: 'pro', status: 'active', started_at: '2025-01-15T00:00:00Z', expires_at: '2026-01-15T00:00:00Z' },
-  { id: 's2', user_email: 'bob@acme.com', user_name: 'Bob Smith', plan: 'starter', status: 'active', started_at: '2025-02-20T00:00:00Z', expires_at: '2026-02-20T00:00:00Z' },
-  { id: 's3', user_email: 'carol@demo.io', user_name: 'Carol Williams', plan: 'enterprise', status: 'active', started_at: '2025-03-01T00:00:00Z', expires_at: '2026-03-01T00:00:00Z' },
-  { id: 's4', user_email: 'dave@test.com', user_name: 'Dave Brown', plan: 'free', status: 'cancelled', started_at: '2025-03-10T00:00:00Z', expires_at: '2025-06-10T00:00:00Z' },
-  { id: 's5', user_email: 'eve@corp.net', user_name: 'Eve Davis', plan: 'pro', status: 'past_due', started_at: '2025-02-01T00:00:00Z', expires_at: '2026-02-01T00:00:00Z' },
-  { id: 's6', user_email: 'frank@startup.io', user_name: 'Frank Miller', plan: 'starter', status: 'expired', started_at: '2024-06-01T00:00:00Z', expires_at: '2025-06-01T00:00:00Z' },
-  { id: 's7', user_email: 'grace@enterprise.co', user_name: 'Grace Wilson', plan: 'enterprise', status: 'active', started_at: '2025-04-01T00:00:00Z', expires_at: '2026-04-01T00:00:00Z' },
-  { id: 's8', user_email: 'henry@freelance.dev', user_name: 'Henry Taylor', plan: 'pro', status: 'active', started_at: '2025-04-15T00:00:00Z', expires_at: '2026-04-15T00:00:00Z' },
-];
+// ─── Data loaded from /api/v1/admin/subscriptions ───
 
 // ─── Badge styles ───
 
@@ -90,7 +79,7 @@ export const SubscriptionsPage: React.FC = () => {
   const { apiFetch } = useAuth();
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, _setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -100,13 +89,25 @@ export const SubscriptionsPage: React.FC = () => {
 
   // Load
   useEffect(() => {
-    // TODO: Replace with real API: apiFetch('/v1/admin/subscriptions')
-    const timer = setTimeout(() => {
-      setSubscriptions(MOCK_SUBSCRIPTIONS);
-      setLoading(false);
-    }, 700);
-    return () => clearTimeout(timer);
-  }, []);
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (search) params.append('search', search);
+        if (statusFilter !== 'all') params.append('status', statusFilter);
+        if (planFilter !== 'all') params.append('plan', planFilter);
+        const res = await apiFetch(`/v1/admin/subscriptions?${params.toString()}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        setSubscriptions(data);
+      } catch (e: any) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [search, statusFilter, planFilter]);
 
   // Derived
   const filtered = useMemo(() => {
@@ -189,7 +190,21 @@ export const SubscriptionsPage: React.FC = () => {
           <option value="past_due">Past Due</option>
         </select>
         <button
-          onClick={() => { setLoading(true); setTimeout(() => { setSubscriptions(MOCK_SUBSCRIPTIONS); setLoading(false); }, 500); }}
+          onClick={() => {
+            const params = new URLSearchParams();
+            if (search) params.append('search', search);
+            if (statusFilter !== 'all') params.append('status', statusFilter);
+            if (planFilter !== 'all') params.append('plan', planFilter);
+            setLoading(true);
+            apiFetch(`/v1/admin/subscriptions?${params.toString()}`)
+              .then(async (res: Response) => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                setSubscriptions(data);
+              })
+              .catch((e: any) => setError(e.message))
+              .finally(() => setLoading(false));
+          }}
           className="flex items-center gap-2 px-3 py-2 text-sm text-slate-400 bg-slate-800 rounded-lg hover:bg-slate-700 transition-colors"
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />

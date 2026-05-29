@@ -6,8 +6,8 @@ interface User {
   name: string | null;
   role: string;
   status: string;
-  created_at: string;
   totp_enabled?: boolean;
+  created_at?: string;
 }
 
 interface Toast {

@@ -25,12 +25,30 @@ interface ActivityItem {
   time: string;
 }
 
-const STAT_CARDS: StatCard[] = [
-  { label: 'Total Users', value: '12,847', change: '+12%', trend: 'up', icon: Users },
-  { label: 'Active Subscriptions', value: '3,421', change: '+8%', trend: 'up', icon: CreditCard },
-  { label: 'API Calls Today', value: '284.6K', change: '+23%', trend: 'up', icon: Activity },
-  { label: 'Error Rate', value: '0.42%', change: '-0.15%', trend: 'down', icon: AlertTriangle },
-];
+const STAT_CARDS: StatCard[] = [];
+
+function StatCards({ metrics }: { metrics: Record<string, any> | null }) {
+  if (!metrics) return null;
+  const cards = [
+    { label: 'Total Users', value: metrics.total_users?.toLocaleString() || '0', change: '+0%', trend: 'up' as const, icon: Users },
+    { label: 'Active Subscriptions', value: metrics.active_subscriptions?.toLocaleString() || '0', change: '+0%', trend: 'up' as const, icon: CreditCard },
+    { label: 'API Calls Total', value: metrics.requests_total?.toLocaleString() || '0', change: '+0%', trend: 'up' as const, icon: Activity },
+    { label: 'Error Rate', value: `${metrics.error_rate_percent?.toFixed(2) || '0'}%`, change: '-0%', trend: 'down' as const, icon: AlertTriangle },
+  ];
+  return (
+    <>
+      {cards.map((card) => (
+        <div key={card.label} className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+          <div className="flex items-center justify-between mb-3">
+            <card.icon size={20} className="text-blue-400" />
+          </div>
+          <p className="text-2xl font-bold text-white">{card.value}</p>
+          <p className="text-xs text-slate-500 mt-1">{card.label}</p>
+        </div>
+      ))}
+    </>
+  );
+}
 
 function generateChartData(): { hour: string; calls: number; errors: number }[] {
   const data = [];
@@ -44,16 +62,7 @@ function generateChartData(): { hour: string; calls: number; errors: number }[] 
   return data;
 }
 
-const RECENT_ACTIVITY: ActivityItem[] = [
-  { event: 'User registered', user: 'alice@example.com', time: '2 min ago' },
-  { event: 'Subscription upgraded', user: 'bob@acme.com', time: '5 min ago' },
-  { event: 'Voucher redeemed', user: 'carol@demo.io', time: '12 min ago' },
-  { event: 'API key revoked', user: 'admin@kaf.io', time: '28 min ago' },
-  { event: 'Feature flag toggled', user: 'admin@kaf.io', time: '45 min ago' },
-  { event: 'User suspended', user: 'dave@test.com', time: '1 hour ago' },
-  { event: 'Voucher batch generated', user: 'admin@kaf.io', time: '2 hours ago' },
-  { event: 'Subscription cancelled', user: 'eve@corp.net', time: '3 hours ago' },
-];
+const RECENT_ACTIVITY: ActivityItem[] = [];
 
 // ─── Page ───
 

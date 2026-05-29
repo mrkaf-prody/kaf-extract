@@ -23,6 +23,8 @@ dependencies = [
     "python-jose[cryptography]>=3.3.0",
     # Webhook dispatch
     "httpx>=0.28",
+    "pyotp>=2.9.0",
+    "qrcode[pil]>=8.2",
 ]
 
 [project.optional-dependencies]
