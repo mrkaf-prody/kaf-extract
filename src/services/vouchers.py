@@ -52,14 +52,17 @@ _WORDS = list(dict.fromkeys(_WORDS))  # dedupe while preserving order
 _WORD_COUNT = len(_WORDS)
 
 
-def _generate_code() -> str:
+def _generate_code(prefix: str | None = None) -> str:
     """Generate a human-readable voucher code: WORD-WORD-WORD.
 
     Uses 3 random words from a curated list of ~513 words.
     Total space: 513^3 ~ 135 million unique combinations.
     Collision risk is negligible for any practical batch size.
     """
-    return "-".join(random.choices(_WORDS, k=3))
+    code = "-".join(random.choices(_WORDS, k=3))
+    if prefix:
+        return f"{prefix}-{code}"
+    return code
 
 
 class VoucherService:
@@ -79,6 +82,7 @@ class VoucherService:
         extraction_credits: int = 0,
         max_uses: int = 1,
         expiry_date: datetime | None = None,
+        prefix: str | None = None,
         created_by: uuid.UUID | None = None,
     ) -> list[Voucher]:
         """Generate a batch of unique voucher codes.
@@ -104,7 +108,7 @@ class VoucherService:
 
         while len(vouchers) < quantity and attempts < max_attempts:
             attempts += 1
-            code = _generate_code()
+            code = _generate_code(prefix=prefix)
 
             if code in existing_codes:
                 continue

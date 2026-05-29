@@ -44,6 +44,11 @@ async def close_redis() -> None:
         logger.info("Redis connection closed")
 
 
+async def get_redis() -> aioredis.Redis:
+    """Return the Redis client, connecting lazily if needed. (public alias)"""
+    return await _get_redis()
+
+
 async def _get_redis() -> aioredis.Redis:
     """Return the Redis client, connecting lazily if needed."""
     if _redis is None:

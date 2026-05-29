@@ -165,7 +165,7 @@ class TestLemonSqueezyProvider:
     @pytest.mark.asyncio
     async def test_handle_webhook_order_created(self, ls_provider):
         payload = {
-            "meta": {"event_name": "order_created"},
+            "meta": {"event_name": "order_created", "event_id": "evt_123"},
             "data": {
                 "id": "order_123",
                 "attributes": {
@@ -178,7 +178,7 @@ class TestLemonSqueezyProvider:
 
         # Mock signature verification to pass
         with patch.object(ls_provider, "verify_signature", return_value=True):
-            result = await ls_provider.handle_webhook(payload, headers)
+            result = await ls_provider.handle_webhook(payload, headers, raw_body=b"")
 
         assert result["event"] == "order_created"
         assert result["action"] == "order_created"
@@ -187,7 +187,7 @@ class TestLemonSqueezyProvider:
     @pytest.mark.asyncio
     async def test_handle_webhook_subscription_updated(self, ls_provider):
         payload = {
-            "meta": {"event_name": "subscription_updated"},
+            "meta": {"event_name": "subscription_updated", "event_id": "evt_456"},
             "data": {
                 "id": "sub_789",
                 "attributes": {
@@ -205,7 +205,7 @@ class TestLemonSqueezyProvider:
                 "src.services.payments.lemonsqueezy.VARIANT_PLAN_MAP",
                 {"var_pro": "pro"},
             ):
-                result = await ls_provider.handle_webhook(payload, headers)
+                result = await ls_provider.handle_webhook(payload, headers, raw_body=b"")
 
         assert result["action"] == "subscription_updated"
         assert result["status"] == "active"
@@ -218,7 +218,7 @@ class TestLemonSqueezyProvider:
 
         with patch.object(ls_provider, "verify_signature", return_value=False):
             with pytest.raises(ValueError, match="Invalid webhook signature"):
-                await ls_provider.handle_webhook(payload, headers)
+                await ls_provider.handle_webhook(payload, headers, raw_body=b"")
 
     def test_verify_signature_valid(self, ls_provider):
         import hashlib
@@ -235,6 +235,21 @@ class TestLemonSqueezyProvider:
 
         assert result is True
 
+    def test_verify_signature_valid_str_payload(self, ls_provider):
+        import hashlib
+        import hmac
+
+        secret = "test-secret"
+        payload_str = '{"test": true}'
+
+        with patch.object(ls_provider, "_webhook_secret", secret):
+            sig = hmac.new(
+                secret.encode(), payload_str.encode(), hashlib.sha256
+            ).hexdigest()
+            result = ls_provider.verify_signature(payload_str, {"x-signature": sig})
+
+        assert result is True
+
     def test_verify_signature_invalid(self, ls_provider):
         with patch.object(ls_provider, "_webhook_secret", "test-secret"):
             result = ls_provider.verify_signature(b"{}", {"x-signature": "wrong"})
@@ -246,6 +261,64 @@ class TestLemonSqueezyProvider:
             result = ls_provider.verify_signature(b"{}", {"x-signature": "anything"})
 
         assert result is True
+
+    @pytest.mark.asyncio
+    async def test_handle_webhook_idempotency_dedup(self, ls_provider):
+        """Same event_id should return dedup status on second call."""
+        payload = {
+            "meta": {"event_name": "order_created", "event_id": "evt_dup_1"},
+            "data": {
+                "id": "order_dup",
+                "attributes": {
+                    "customer": {"email": "dup@example.com"},
+                    "first_order_item": {"variant_id": 999},
+                },
+            },
+        }
+        headers = {"x-signature": "fake"}
+
+        with patch.object(ls_provider, "verify_signature", return_value=True):
+            # Patch Redis so idempotency works without a real server
+            from src.services.payments import webhooks as _wh_mod
+            _seen = set()
+            async def _is_processed(ev_id: str) -> bool:
+                if ev_id in _seen:
+                    return True
+                _seen.add(ev_id)
+                return False
+            async def _mark_processed(ev_id: str, ttl: int = 86_400) -> None:
+                _seen.add(ev_id)
+
+            with patch.object(_wh_mod, "is_webhook_processed", _is_processed), \
+                 patch.object(_wh_mod, "mark_webhook_processed", _mark_processed):
+
+                # First call processes normally
+                result1 = await ls_provider.handle_webhook(payload, headers, raw_body=b"")
+                assert result1["status"] == "processed"
+
+                # Second call with same event_id returns dedup
+                result2 = await ls_provider.handle_webhook(payload, headers, raw_body=b"")
+                assert result2["status"] == "dedup"
+                assert result2["event_id"] == "evt_dup_1"
+
+    @pytest.mark.asyncio
+    async def test_handle_webhook_raw_body_signature(self, ls_provider):
+        """Provider should verify signature against raw body, not re-serialised JSON."""
+        import hashlib
+        import hmac
+
+        secret = "sig-secret"
+        raw_body = b'{"meta":{"event_name":"order_created","event_id":"evt_raw"},"data":{"id":"o1"}}'
+        sig = hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
+
+        payload = json.loads(raw_body)
+        headers = {"x-signature": sig}
+
+        with patch.object(ls_provider, "_webhook_secret", secret):
+            result = await ls_provider.handle_webhook(payload, headers, raw_body=raw_body)
+
+        assert result["status"] == "processed"
+        assert result["event"] == "order_created"
 
     @pytest.mark.asyncio
     async def test_cancel_subscription(self, ls_provider):
@@ -322,9 +395,8 @@ class TestPaddleStubProvider:
         result = await paddle_provider.get_subscription("sub_1")
         assert result["subscription_id"] == "sub_1"
 
-    @pytest.mark.asyncio
-    async def test_verify_signature_stub(self, paddle_provider):
-        result = await paddle_provider.verify_signature(b"{}", {})
+    def test_verify_signature_stub(self, paddle_provider):
+        result = paddle_provider.verify_signature(b"{}", {})
         assert result is True
 
 

@@ -38,7 +38,7 @@ class PaymentProvider(ABC):
 
     @abstractmethod
     async def handle_webhook(
-        self, payload: dict[str, Any], headers: dict[str, str]
+        self, payload: dict[str, Any], headers: dict[str, str], *, raw_body: bytes | str = b""
     ) -> dict[str, Any]:
         """Process an incoming webhook event from the provider.
 
@@ -121,9 +121,9 @@ class PaymentDispatcher:
         return await self._provider.create_checkout(user_id, plan, **kwargs)
 
     async def handle_webhook(
-        self, payload: dict[str, Any], headers: dict[str, str]
+        self, payload: dict[str, Any], headers: dict[str, str], *, raw_body: bytes | str = b""
     ) -> dict[str, Any]:
-        return await self._provider.handle_webhook(payload, headers)
+        return await self._provider.handle_webhook(payload, headers, raw_body=raw_body)
 
     async def cancel_subscription(self, subscription_id: str) -> dict[str, Any]:
         return await self._provider.cancel_subscription(subscription_id)

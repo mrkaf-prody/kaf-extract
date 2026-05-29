@@ -173,27 +173,38 @@ class LemonSqueezyProvider(PaymentProvider):
         }
 
     async def handle_webhook(
-        self, payload: dict[str, Any], headers: dict[str, str]
+        self, payload: dict[str, Any], headers: dict[str, str], *, raw_body: bytes | str = b""
     ) -> dict[str, Any]:
         """Process LemonSqueezy webhook events.
 
         Supported events: order_created, subscription_updated,
         subscription_cancelled, subscription_expired.
         """
-        # Verify signature
-        raw_body = json.dumps(payload) if isinstance(payload, dict) else str(payload)
-        sig_header = headers.get("x-signature", "")
-        if not self.verify_signature(raw_body, headers):
+        # Raw body for signature verification
+        if raw_body:
+            raw_body_for_sig = raw_body if isinstance(raw_body, str) else raw_body.decode("utf-8", errors="replace")
+        else:
+            raw_body_for_sig = json.dumps(payload, sort_keys=True) if isinstance(payload, dict) else str(payload)
+
+        if not self.verify_signature(raw_body_for_sig, headers):
             logger.warning("LemonSqueezy webhook signature verification failed")
             raise ValueError("Invalid webhook signature")
 
         event_name = payload.get("meta", {}).get("event_name", "")
+        event_id = payload.get("meta", {}).get("event_id", "")
         data = payload.get("data", {})
         attrs = data.get("attributes", {})
 
-        logger.info("LemonSqueezy webhook event: %s", event_name)
+        logger.info("LemonSqueezy webhook event: %s event_id=%s", event_name, event_id)
 
-        result = {"status": "processed", "event": event_name, "provider": "lemonsqueezy"}
+        # Idempotency check
+        from src.services.payments.webhooks import is_webhook_processed, mark_webhook_processed
+
+        if event_id and await is_webhook_processed(event_id):
+            logger.info("LemonSqueezy webhook %s already processed — dedup", event_id)
+            return {"status": "dedup", "event": event_name, "event_id": event_id, "provider": "lemonsqueezy"}
+
+        result = {"status": "processed", "event": event_name, "event_id": event_id, "provider": "lemonsqueezy"}
 
         if event_name == "order_created":
             result["action"] = "order_created"
@@ -228,6 +239,9 @@ class LemonSqueezyProvider(PaymentProvider):
         else:
             result["action"] = "unknown"
             logger.info("Unhandled LemonSqueezy event: %s", event_name)
+
+        if event_id:
+            await mark_webhook_processed(event_id)
 
         return result
 

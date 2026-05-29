@@ -34,7 +34,7 @@ async def payment_webhook(request: Request):
     dispatcher = PaymentDispatcher()
 
     try:
-        result = await dispatcher.handle_webhook(payload, headers)
+        result = await dispatcher.handle_webhook(payload, headers, raw_body=raw_body)
     except ValueError as e:
         # Signature verification failed
         logger.warning("Webhook signature verification failed: %s", e)

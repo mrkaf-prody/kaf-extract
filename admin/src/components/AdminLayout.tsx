@@ -6,6 +6,14 @@ import {
   BarChart3, FileText, LogOut, Shield, User, ChevronLeft, ChevronRight
 } from 'lucide-react';
 
+const KafLogo: React.FC<{ size?: number }> = ({ size = 20 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="24" height="24" rx="6" fill="#0f172a" />
+    <path d="M7 6L14 12L7 18" stroke="#22d3ee" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M13 6L20 12L13 18" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 const navItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'Overview', end: true },
   { to: '/admin/users', icon: Users, label: 'Users' },
@@ -46,9 +54,12 @@ export const AdminLayout: React.FC = () => {
     <div className="flex h-screen">
       {/* Sidebar */}
       <aside className={`${collapsed ? 'w-[60px]' : 'w-60'} bg-slate-900 border-r border-slate-800 flex flex-col transition-all duration-300`}>
-        <div className={`p-4 border-b border-slate-800 ${collapsed ? 'px-2 text-center' : ''}`}>
-          <h1 className={`text-lg font-bold text-white ${collapsed ? 'text-xs' : ''}`}>{collapsed ? 'K' : 'Kaf Extract'}</h1>
-          {!collapsed && <p className="text-xs text-slate-500 mt-0.5">Admin Panel</p>}
+        <div className={`p-4 border-b border-slate-800 flex items-center gap-2.5 ${collapsed ? 'px-2 justify-center' : ''}`}>
+          <KafLogo size={collapsed ? 18 : 22} />
+          <div className={`${collapsed ? 'hidden' : 'block'}`}>
+            <h1 className="text-lg font-bold text-white tracking-tight leading-none">Kaf Extract</h1>
+            <p className="text-[10px] text-cyan-400/80 mt-0.5 font-medium tracking-wide uppercase">Admin Panel</p>
+          </div>
         </div>
         <nav className="flex-1 py-2 overflow-y-auto">
           {navItems.map(item => (

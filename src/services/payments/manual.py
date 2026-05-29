@@ -218,7 +218,7 @@ class ManualPaymentProvider(PaymentProvider):
         }
 
     async def handle_webhook(
-        self, payload: dict[str, Any], headers: dict[str, str]
+        self, payload: dict[str, Any], headers: dict[str, str], *, raw_body: bytes | str = b""
     ) -> dict[str, Any]:
         """Manual provider has no webhooks."""
         logger.warning("Manual provider received webhook — ignoring")

@@ -106,7 +106,7 @@ class PaddleProvider(PaymentProvider):
         }
 
     async def handle_webhook(
-        self, payload: dict[str, Any], headers: dict[str, str]
+        self, payload: dict[str, Any], headers: dict[str, str], *, raw_body: bytes | str = b""
     ) -> dict[str, Any]:
         """Process Paddle webhook (stub)."""
         logger.info("Paddle handle_webhook called (STUB)")
