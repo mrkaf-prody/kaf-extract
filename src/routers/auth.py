@@ -227,8 +227,14 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     try:
         from src.services.trials import start_trial
         await start_trial(db, user.id)
-    except Exception:
-        pass  # Non-fatal — user can still use the service
+    except ValueError:
+        pass  # Already has a trial — non-fatal
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(
+            "Trial start failed for user %s: %s", user.id, exc,
+            exc_info=True,
+        )
 
     # Generate tokens
     return await _create_token_response(db, user.id, user.email, user.role)
