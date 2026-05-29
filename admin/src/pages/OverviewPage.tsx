@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Users, CreditCard, Activity, AlertTriangle,
@@ -71,27 +71,41 @@ export const OverviewPage: React.FC = () => {
   const [metrics, setMetrics] = useState<Record<string, any> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [chartData] = useState(() => generateChartData());
+  const [chartData, setChartData] = useState(() => generateChartData());
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [stats, systemMetrics] = await Promise.all([
+        apiFetch('/api/v1/admin/stats').catch(() => null),
+        apiFetch('/metrics').catch(() => null),
+      ]);
+      setMetrics({
+        ...stats,
+        ...systemMetrics,
+        total_users: stats?.total_users ?? 0,
+        active_subscriptions: stats?.active_subscriptions ?? 0,
+        requests_total: systemMetrics?.requests_total ?? 0,
+        error_count: systemMetrics?.error_count ?? 0,
+        db_status: systemMetrics?.db_status ?? 'unknown',
+        redis_status: systemMetrics?.redis_status ?? 'unknown',
+        avg_duration_ms: systemMetrics?.avg_duration_ms ?? 0,
+        queue_depth: systemMetrics?.queue_depth ?? 0,
+        uptime_seconds: systemMetrics?.uptime_seconds ?? 0,
+        cache_hits: systemMetrics?.cache_hits ?? 0,
+        cache_misses: systemMetrics?.cache_misses ?? 0,
+      });
+    } catch (err: any) {
+      setError(err.message || 'Failed to load dashboard');
+    } finally {
+      setLoading(false);
+    }
+  }, [apiFetch]);
 
   useEffect(() => {
-    // TODO: Replace with real API call when /metrics endpoint is ready
-    // apiFetch('/v1/admin/metrics').then(setMetrics).catch(setError).finally(() => setLoading(false));
-    const timer = setTimeout(() => {
-      setMetrics({
-        requests_total: 284621,
-        cache_hits: 189234,
-        cache_misses: 95387,
-        avg_duration_ms: 42.3,
-        queue_depth: 3,
-        error_count: 1195,
-        uptime_seconds: 86400,
-        db_status: 'ok',
-        redis_status: 'ok',
-      });
-      setLoading(false);
-    }, 800);
-    return () => clearTimeout(timer);
-  }, []);
+    load();
+  }, [load]);
 
   const trendColor = (trend: 'up' | 'down') =>
     trend === 'up' ? 'text-emerald-400' : 'text-red-400';
@@ -117,7 +131,7 @@ export const OverviewPage: React.FC = () => {
           <p className="text-sm text-slate-400 mt-1">Key metrics and system activity</p>
         </div>
         <button
-          onClick={() => { setLoading(true); setTimeout(() => setLoading(false), 600); }}
+          onClick={load}
           className="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-400 bg-slate-800 rounded-lg hover:bg-slate-700 transition-colors"
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />

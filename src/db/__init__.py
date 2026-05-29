@@ -32,3 +32,10 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         except Exception:
             await session.rollback()
             raise
+
+
+async def create_tables() -> None:
+    """Create all SQLAlchemy tables that don't exist yet."""
+    from src.models.sql_models import Base
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)

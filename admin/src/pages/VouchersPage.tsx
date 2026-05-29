@@ -106,7 +106,7 @@ export const VouchersPage: React.FC = () => {
       if (statusFilter !== 'all') params.set('status', statusFilter);
       if (search) params.set('search', search);
 
-      const data = await apiFetch(`/v1/admin/vouchers?${params.toString()}`);
+      const data = await apiFetch(`/api/v1/admin/vouchers?${params.toString()}`);
       // Map backend response to frontend shape
       const mapped: Voucher[] = data.vouchers.map((v: any) => ({
         id: v.id,
@@ -147,7 +147,7 @@ export const VouchersPage: React.FC = () => {
       };
       if (genExpiry) payload.expiry_date = genExpiry;
 
-      const res = await apiFetch('/v1/admin/vouchers/generate', {
+      const res = await apiFetch('/api/v1/admin/vouchers/generate', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
@@ -171,7 +171,7 @@ export const VouchersPage: React.FC = () => {
   // ─── Invalidate ───
   const handleInvalidate = useCallback(async (voucherId: string) => {
     try {
-      await apiFetch(`/v1/admin/vouchers/${voucherId}`, { method: 'DELETE' });
+      await apiFetch(`/api/v1/admin/vouchers/${voucherId}`, { method: 'DELETE' });
       setToast({ message: 'Voucher invalidated', type: 'success' });
       // Update local state
       setVouchers((prev) =>

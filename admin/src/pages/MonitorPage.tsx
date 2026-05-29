@@ -152,8 +152,7 @@ export const MonitorPage: React.FC = () => {
 
   const fetchMetrics = useCallback(async () => {
     try {
-      // TODO: Replace with real API: const data = await apiFetch('/v1/admin/metrics');
-      const data = generateMockMetrics();
+      const data = await apiFetch('/metrics');
       setMetrics(data);
       setError(null);
     } catch (err: any) {
@@ -161,7 +160,7 @@ export const MonitorPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []); // apiFetch intentionally not used yet until backend is wired
+  }, [apiFetch]);
 
   // Initial load + auto-refresh
   useEffect(() => {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { User, Lock, Save, AlertTriangle, CheckCircle } from 'lucide-react';
+import { User, Lock, Save, AlertTriangle, CheckCircle, Shield } from 'lucide-react';
 
 export const ProfilePage: React.FC = () => {
   const { user, login } = useAuth();
@@ -210,6 +210,27 @@ export const ProfilePage: React.FC = () => {
             {pwLoading ? 'Changing...' : 'Change Password'}
           </button>
         </form>
+      </div>
+
+      {/* 2FA Section — Coming Soon */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <Shield size={20} className="text-amber-400" />
+          <h3 className="text-lg font-semibold text-white">Two-Factor Authentication</h3>
+          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/30">
+            Coming soon
+          </span>
+        </div>
+        <p className="text-sm text-slate-500 mb-4">
+          Add an extra layer of security to your admin account with TOTP-based 2FA. 
+          Once enabled, you'll need to enter a code from your authenticator app each time you sign in.
+        </p>
+        <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
+          <div className="flex items-center gap-3">
+            <div className="w-2 h-2 rounded-full bg-slate-600" />
+            <p className="text-sm text-slate-500">Status: <span className="text-slate-400">Not configured</span></p>
+          </div>
+        </div>
       </div>
     </div>
   );

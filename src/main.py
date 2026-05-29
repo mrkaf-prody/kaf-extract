@@ -41,6 +41,14 @@ async def lifespan(app: FastAPI):
         import sys
         print(f"WARNING: Migration failed (non-fatal): {e}", file=sys.stderr)
 
+    # Ensure all tables exist (auto-create new models — safe for existing tables)
+    try:
+        from src.db import create_tables
+        await create_tables()
+    except Exception as e:
+        import sys
+        print(f"WARNING: Auto table creation failed (non-fatal): {e}", file=sys.stderr)
+
     # Connect Redis (caching + rate limiter + job queue)
     try:
         from src.services.cache import connect_redis

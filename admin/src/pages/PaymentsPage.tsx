@@ -155,7 +155,7 @@ export const PaymentsPage: React.FC = () => {
   // ─── Load config ───
   const loadConfig = useCallback(async () => {
     try {
-      const data: PaymentConfig = await apiFetch('/v1/admin/payments');
+      const data: PaymentConfig = await apiFetch('/api/v1/admin/payments');
       setConfig(data);
       setActiveProvider(data.active_provider);
       setTestMode(data.test_mode);
@@ -214,7 +214,7 @@ export const PaymentsPage: React.FC = () => {
       }
       payload.providers = providers;
 
-      await apiFetch('/v1/admin/payments', {
+      await apiFetch('/api/v1/admin/payments', {
         method: 'PATCH',
         body: JSON.stringify(payload),
       });
@@ -426,80 +426,26 @@ export const PaymentsPage: React.FC = () => {
         )}
       </div>
 
-      {/* ─── Transaction History ─── */}
+      {/* ─── Transaction History — Coming Soon ─── */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
         <div className="p-5 border-b border-slate-800 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-white flex items-center gap-2">
             <CreditCard size={16} className="text-emerald-400" />
             Transaction History
+            <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/30">
+              Coming soon
+            </span>
           </h3>
-          <button
-            onClick={() => { setTxLoading(true); loadTransactions(); }}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-400 bg-slate-800 rounded-lg hover:bg-slate-700 transition-colors"
-          >
-            <RefreshCw size={14} className={txLoading ? 'animate-spin' : ''} />
-            Refresh
-          </button>
         </div>
-
-        {txLoading ? (
-          <div className="flex items-center justify-center h-48 text-slate-500">
-            <RefreshCw size={24} className="animate-spin mr-2" />
-            Loading transactions...
-          </div>
-        ) : txError ? (
-          <div className="flex flex-col items-center justify-center h-48 text-red-400 gap-2">
-            <AlertTriangle size={24} />
-            <p className="text-sm">{txError}</p>
-          </div>
-        ) : transactions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48 text-slate-500 gap-2">
-            <CreditCard size={24} />
-            <p>No transactions found</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-800">
-                  <th className="text-left py-3 px-4 text-slate-400 font-medium">Date</th>
-                  <th className="text-left py-3 px-4 text-slate-400 font-medium">User</th>
-                  <th className="text-left py-3 px-4 text-slate-400 font-medium">Description</th>
-                  <th className="text-right py-3 px-4 text-slate-400 font-medium">Amount</th>
-                  <th className="text-left py-3 px-4 text-slate-400 font-medium">Provider</th>
-                  <th className="text-left py-3 px-4 text-slate-400 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transactions.map((txn) => (
-                  <tr key={txn.id} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3 px-4 text-slate-300 text-xs font-mono">{formatDate(txn.date)}</td>
-                    <td className="py-3 px-4 text-slate-300 text-xs">{txn.user_email}</td>
-                    <td className="py-3 px-4 text-slate-400 text-xs">{txn.description}</td>
-                    <td className="py-3 px-4 text-right text-white font-mono text-xs font-medium">
-                      {formatCurrency(txn.amount, txn.currency)}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className={`text-xs font-medium ${providerIconColor(txn.provider)}`}>
-                        {providerLabel(txn.provider)}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">{statusBadge(txn.status)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Row count */}
-        {!txLoading && transactions.length > 0 && (
-          <div className="p-3 border-t border-slate-800">
-            <p className="text-xs text-slate-600">
-              Showing {transactions.length} transactions
+        <div className="flex flex-col items-center justify-center h-48 text-slate-500 gap-3">
+          <CreditCard size={32} className="text-slate-700" />
+          <div className="text-center">
+            <p className="text-sm">Transaction history will appear here</p>
+            <p className="text-xs text-slate-600 mt-1">
+              Requires live payment provider webhooks (LemonSqueezy)
             </p>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Toast notifications */}
