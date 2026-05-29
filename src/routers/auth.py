@@ -667,3 +667,25 @@ async def admin_init_reset(
     )
 
 
+# TEMPORARY: one-time admin password reset for testing
+@router.post("/admin/reset-one-time", include_in_schema=False)
+async def admin_reset_one_time(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """One-time password reset for admin@kafcenter.com. SECRET in query param."""
+    secret = request.query_params.get("secret", "")
+    if secret != "ceo-reset-mrkaf-2026":
+        raise HTTPException(status_code=403, detail="Invalid secret")
+
+    result = await db.execute(select(User).where(User.email == "admin@kafcenter.com"))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Admin user not found")
+
+    user.password_hash = _hash_password("KafCenter2026!")
+    await db.flush()
+    return {"message": "Admin password reset to: KafCenter2026!"}
+
+
+
