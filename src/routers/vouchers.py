@@ -27,7 +27,6 @@ class GenerateRequest(BaseModel):
     extraction_credits: int = Field(default=0, ge=0)
     max_uses: int = Field(default=1, ge=1)
     expiry_date: str | None = None  # ISO date string
-    prefix: str = "KAF"
 
 
 class GenerateResponse(BaseModel):

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { CreditCard, Check, Zap, Clock, ArrowUpCircle } from 'lucide-react';
+import { CreditCard, Check, Zap, Clock, ArrowUpCircle, Ticket } from 'lucide-react';
 
 interface Plan {
   key: string;
@@ -35,12 +35,25 @@ interface SubscriptionStatus {
   available_plans: Plan[];
 }
 
+interface RedemptionResult {
+  subscription_id: string;
+  plan: string;
+  duration_days: number;
+  period_end: string;
+  extraction_credits: number;
+}
+
 export const BillingPage: React.FC = () => {
   const { apiFetch, showError } = useAuth();
   const [data, setData] = useState<SubscriptionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Voucher redemption
+  const [voucherCode, setVoucherCode] = useState('');
+  const [redeeming, setRedeeming] = useState(false);
+  const [redeemResult, setRedeemResult] = useState<RedemptionResult | null>(null);
 
   const fetchSubscription = useCallback(() => {
     setLoading(true);
@@ -83,6 +96,27 @@ export const BillingPage: React.FC = () => {
       setMessage({ type: 'error', text: err.message || 'Cancel failed' });
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleRedeem = async () => {
+    const code = voucherCode.trim();
+    if (!code) return;
+    setRedeeming(true);
+    setMessage(null);
+    setRedeemResult(null);
+    try {
+      const res = await apiFetch('/api/v1/vouchers/redeem', {
+        method: 'POST',
+        body: JSON.stringify({ code }),
+      });
+      setRedeemResult(res);
+      setMessage({ type: 'success', text: `Voucher redeemed! ${res.plan} plan activated.`, });
+      fetchSubscription();
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message || 'Voucher redemption failed' });
+    } finally {
+      setRedeeming(false);
     }
   };
 
@@ -200,6 +234,64 @@ export const BillingPage: React.FC = () => {
           </div>
         ) : (
           <p className="text-slate-400 text-sm">No active subscription or trial. Choose a plan below.</p>
+        )}
+      </div>
+
+      {/* Voucher redemption */}
+      <div className="bg-slate-900 border border-slate-800 rounded-lg p-6 mb-6">
+        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <Ticket size={20} className="text-amber-400" />
+          Redeem Voucher
+        </h3>
+        <p className="text-sm text-slate-400 mb-4">
+          Got a voucher code? Enter it below to activate your subscription.
+        </p>
+
+        <div className="flex gap-3 flex-col sm:flex-row">
+          <input
+            type="text"
+            placeholder="Enter voucher code (e.g., SWORD-STAR-EMBER)"
+            value={voucherCode}
+            onChange={e => setVoucherCode(e.target.value.toUpperCase())}
+            disabled={redeeming}
+            className="flex-1 px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white
+                       placeholder:text-slate-500 focus:outline-none focus:border-amber-500/50 transition-colors
+                       disabled:opacity-50 disabled:cursor-not-allowed"
+          />
+          <button
+            onClick={handleRedeem}
+            disabled={redeeming || !voucherCode.trim()}
+            className="px-6 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:bg-amber-800/50 disabled:cursor-not-allowed
+                       text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+          >
+            {redeeming ? 'Redeeming...' : 'Redeem Voucher'}
+          </button>
+        </div>
+
+        {redeemResult && (
+          <div className="mt-4 p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
+            <div className="flex items-start gap-3">
+              <Check size={18} className="text-green-400 mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-sm text-green-300 font-medium">
+                  Voucher redeemed successfully!
+                </p>
+                <p className="text-xs text-green-400/80">
+                  Plan: <span className="text-green-300 capitalize">{redeemResult.plan}</span> • Duration: {redeemResult.duration_days} days
+                </p>
+                {redeemResult.extraction_credits > 0 && (
+                  <p className="text-xs text-green-400/80">
+                    Bonus credits: {redeemResult.extraction_credits} extractions
+                  </p>
+                )}
+                <p className="text-xs text-slate-400">
+                  Active until {new Date(redeemResult.period_end).toLocaleDateString('en-US', {
+                    year: 'numeric', month: 'long', day: 'numeric'
+                  })}
+                </p>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 

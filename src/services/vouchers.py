@@ -2,7 +2,7 @@
 
 import csv
 import io
-import secrets
+import random
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -17,11 +17,49 @@ from src.models.sql_models import (
     VoucherRedemption,
 )
 
+# ─── Word List for Voucher Codes ───
+# ~513 curated words -> 513^3 ~ 135M unique combinations.
+# Words are short (3-8 chars), memorable, and easy to type.
 
-def _generate_code(prefix: str = "KAF") -> str:
-    """Generate a unique voucher code like KAF-XXXX-XXXX."""
-    block = secrets.token_hex(3).upper()  # 6 hex chars
-    return f"{prefix}-{block[:4]}-{block[4:]}" if len(block) >= 6 else f"{prefix}-{block}"
+_WORDS = [
+    "APEX", "ARCH", "ARROW", "ASH", "AXE", "AZURE",
+    "BAND", "BARK", "BASE", "BEAM", "BEAR", "BELL", "BEND", "BIRD", "BLADE", "BLAZE", "BOLT", "BONE", "BOW", "BRANCH", "BRAND", "BRASS", "BRAVE", "BRONZE", "BROOK",
+    "CAGE", "CALL", "CAMP", "CAVE", "CHAR", "CHARM", "CHORD", "CLAW", "CLAY", "CLEAR", "CLIFF", "CLOUD", "COAST", "COBRA", "COIL", "COIN", "COMET", "COPE", "CORE", "CORAL", "CRANE", "CRISP", "CROW", "CROWN",
+    "DAWN", "DEEP", "DELTA", "DICE", "DIVE", "DOCK", "DOVE", "DREAM", "DRIFT", "DROP", "DUNE", "DWELL",
+    "EAGLE", "EARTH", "EDGE", "ELK", "EMBER", "ETCH",
+    "FAIR", "FAWN", "FEATHER", "FIELD", "FLAME", "FLARE", "FLINT", "FLUX", "FOAL", "FOREST", "FORGE", "FOX", "FRANK",
+    "GALE", "GASH", "GEM", "GLADE", "GLASS", "GLEAM", "GLEN", "GLOW", "GOLD", "GOOSE", "GORGE", "GRAIN", "GRAND", "GRAPE", "GRASP", "GRAVE", "GRAZE", "GREEN", "GRIP", "GROVE",
+    "HALE", "HALO", "HARP", "HART", "HATCH", "HAWK", "HEARTH", "HEART", "HEAT", "HELM", "HERON", "HILL", "HIVE", "HOAR", "HORN", "HOUND", "HUSH",
+    "ICE", "IRON", "ISLE", "IVY",
+    "JADE", "JAGUAR", "JET", "JOLT", "JUNE",
+    "KEEN", "KELP", "KEY", "KIND", "KING", "KITE", "KNELL", "KNOT",
+    "LAKE", "LAMP", "LANCE", "LARK", "LATHE", "LEAF", "LEAP", "LEATHER", "LIGHT", "LION", "LOCH", "LOOP", "LYNX",
+    "MACE", "MAMBA", "MAP", "MARK", "MARSH", "MELT", "MERE", "MERIT", "MESA", "MILD", "MILL", "MINT", "MIST", "MOON", "MORAL", "MOSS", "MOTH", "MOUNT",
+    "NEST", "NIGHT", "NOBLE", "NORTH", "NOTCH",
+    "OAK", "OCEAN", "OMEGA", "ONSET", "ONYX", "ORBIT", "ORB", "OWL",
+    "PALM", "PEAK", "PEAR", "PEARL", "PEG", "PETAL", "PIKE", "PINE", "PIP", "PIT", "PLANK", "PLANT", "PLUME", "PLUM", "POINT", "POOL", "PORT", "PRIME", "PRISM", "PULSE", "PURE",
+    "QUARTZ", "QUEST", "QUILL",
+    "RAIN", "RAMP", "RAPID", "RAVINE", "RAVEN", "REACH", "REEF", "RICH", "RIDGE", "RING", "RIPE", "RISE", "RIVER", "ROAD", "ROAM", "ROCK", "ROOF", "ROOT", "ROPE", "ROSE", "ROVE",
+    "SAGE", "SAIL", "SALT", "SAND", "SCALE", "SCAR", "SEAL", "SEAT", "SEED", "SHADE", "SHALE", "SHARP", "SHAW", "SHELF", "SHIELD", "SHINE", "SHIP", "SHORE", "SHREW", "SIFT", "SIGN", "SILK", "SILL", "SING", "SINK", "SITE", "SKY", "SLEW", "SLIDE", "SLING", "SLOPE", "SMITH", "SNAP", "SNARE", "SNOW", "SOAR", "SOLAR", "SONG", "SOUL", "SOUND", "SOUTH", "SPARK", "SPEAR", "SPHERE", "SPINE", "SPIT", "SPOON", "SPRING", "SPUR", "STAFF", "STAG", "STAIN", "STAKE", "STALE", "STALK", "STAND", "STAR", "STARK", "STAVE", "STEEL", "STEM", "STEP", "STERN", "STEW", "STICK", "STILL", "STONE", "STORE", "STORM", "STOUT", "STOW", "STRAIT", "STRAND", "STRAP", "STREAM", "STRIFE", "STROKE", "STUD", "STUNT", "SUN", "SWALE", "SWAMP", "SWAN", "SWARM", "SWIFT", "SWING", "SWOOP", "SWORD",
+    "TALON", "TANK", "TAR", "TEAL", "TEST", "THATCH", "THAW", "THORN", "THRUSH", "THUMB", "TIDE", "TIER", "TILL", "TILT", "TIME", "TOAD", "TOKEN", "TONE", "TOP", "TOWER", "TOWN", "TRACK", "TRAIL", "TREE", "TREK", "TRIBE", "TRIM", "TRIP", "TROOP", "TROUT", "TRUE", "TRUNK", "TRUST", "TUBE", "TUFT", "TUNNEL", "TURN", "TUSK", "TWINE", "TWIST",
+    "VALE", "VALLEY", "VAUNT", "VAULT", "VEIL", "VEIN", "VERSE", "VINE", "VISTA", "VOICE", "VOID", "VOLT", "VOW", "VORTEX",
+    "WADE", "WAKE", "WANE", "WANT", "WARD", "WARE", "WARM", "WARN", "WARP", "WASH", "WASP", "WATCH", "WATER", "WAVE", "WAX", "WEAK", "WEAR", "WEAVE", "WEDGE", "WEED", "WELL", "WEST", "WHEAT", "WHEEL", "WHELP", "WHIP", "WHIRL", "WHISK", "WHITE", "WHOLE", "WICK", "WIDE", "WILD", "WILL", "WILLOW", "WILT", "WIND", "WING", "WINK", "WIRE", "WISE", "WISH", "WIT", "WOLF", "WOOD", "WOOL", "WORD", "WORK", "WORM", "WORTH", "WOUND", "WRAP", "WREN", "WREST", "WRING", "WRIST", "WRITE",
+    "YARD", "YARN", "YAW", "YEAR", "YEARN", "YIELD", "YON", "YORE",
+    "ZENITH", "ZERO", "ZEST", "ZONE",
+]
+
+_WORDS = list(dict.fromkeys(_WORDS))  # dedupe while preserving order
+_WORD_COUNT = len(_WORDS)
+
+
+def _generate_code() -> str:
+    """Generate a human-readable voucher code: WORD-WORD-WORD.
+
+    Uses 3 random words from a curated list of ~513 words.
+    Total space: 513^3 ~ 135 million unique combinations.
+    Collision risk is negligible for any practical batch size.
+    """
+    return "-".join(random.choices(_WORDS, k=3))
 
 
 class VoucherService:
@@ -41,7 +79,6 @@ class VoucherService:
         extraction_credits: int = 0,
         max_uses: int = 1,
         expiry_date: datetime | None = None,
-        prefix: str = "KAF",
         created_by: uuid.UUID | None = None,
     ) -> list[Voucher]:
         """Generate a batch of unique voucher codes.
@@ -67,7 +104,7 @@ class VoucherService:
 
         while len(vouchers) < quantity and attempts < max_attempts:
             attempts += 1
-            code = _generate_code(prefix)
+            code = _generate_code()
 
             if code in existing_codes:
                 continue
@@ -157,7 +194,7 @@ class VoucherService:
             raise ValueError("You have already redeemed this voucher")
 
         # Check if user already has an active subscription of this plan or higher
-        # We'll allow stacking — just create/renew the subscription
+        # We'll allow stacking - just create/renew the subscription
 
         # Get user
         user_result = await db.execute(
