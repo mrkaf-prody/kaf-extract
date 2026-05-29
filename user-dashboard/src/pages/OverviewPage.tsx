@@ -18,18 +18,20 @@ interface KeyItem {
   created_at: string;
 }
 
-interface ExtractRecord {
+interface HistoryItem {
   id: string;
-  url: string;
+  name?: string;
+  url?: string;
   status: string;
-  created_at: string;
+  last_run_at?: string;
+  created_at?: string;
 }
 
 export const OverviewPage = () => {
   const { user, apiFetch, showError } = useAuth();
   const [usage, setUsage] = useState<UsageStats | null>(null);
   const [keys, setKeys] = useState<KeyItem[]>([]);
-  const [recent, setRecent] = useState<ExtractRecord[]>([]);
+  const [recent, setRecent] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -37,32 +39,29 @@ export const OverviewPage = () => {
     (async () => {
       try {
         const [u, kData, h] = await Promise.all([
-          apiFetch('/api/v1/usage'),
-          apiFetch('/api/v1/keys'),
+          apiFetch('/api/v1/usage').catch((err: any) => {
+            showError(err.message || 'Failed to load usage');
+            return null;
+          }),
+          apiFetch('/api/v1/keys').catch((err: any) => {
+            showError(err.message || 'Failed to load keys');
+            return null;
+          }),
           apiFetch('/api/v1/extract/history?limit=5').catch((err: any) => {
             showError(err.message || 'Failed to load history');
             return null;
           }),
         ]);
         if (cancelled) return;
-        console.log('Usage:', u);
-        console.log('Keys:', kData);
-        console.log('History:', h);
-        setUsage(u);
-        const arr = Array.isArray(kData) ? kData : kData.keys || [];
-        setKeys(arr);
-        const recentList = Array.isArray(h)
-          ? h
-          : h?.history || h?.extractions || [];
-        setRecent(recentList);
-      } catch (e) {
-        console.error('Overview load error:', e);
+        if (u) setUsage(u);
+        if (kData) setKeys(Array.isArray(kData) ? kData : kData.keys || []);
+        if (h) setRecent(Array.isArray(h) ? h : h.history || h.extractions || []);
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [apiFetch]);
+  }, [apiFetch, showError]);
 
   if (loading) {
     return (
@@ -140,10 +139,12 @@ export const OverviewPage = () => {
               <div key={item.id || i} className="flex items-center justify-between py-2 px-3 bg-[#14141f] rounded-lg text-sm border border-[#12121a]">
                 <div className="flex items-center gap-3 min-w-0">
                   <span className={`w-2 h-2 rounded-full flex-shrink-0 ${item.status === 'success' ? 'bg-[#00d4a0]' : 'bg-[#ff5f56]'}`} />
-                  <span className="text-[#9a9aae] truncate max-w-xs">{item.url}</span>
+                  <span className="text-[#9a9aae] truncate max-w-xs">{item.url || item.name || 'Extraction'}</span>
                 </div>
                 <span className="text-[#5c5c70] text-xs ml-4 flex-shrink-0">
-                  {item.created_at ? new Date(item.created_at).toLocaleDateString() : ''}
+                  {item.last_run_at || item.created_at
+                    ? new Date(item.last_run_at || item.created_at!).toLocaleDateString()
+                    : ''}
                 </span>
               </div>
             ))}

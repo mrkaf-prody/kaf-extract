@@ -1,11 +1,11 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Search, AlertTriangle } from 'lucide-react';
+import { Search, AlertTriangle, Trash2, Ban, CheckCircle, Loader2 } from 'lucide-react';
 
 interface UserItem {
   id: string;
   email: string;
-  name: string;
+  name: string | null;
   role: string;
   status: string;
   created_at: string;
@@ -16,12 +16,15 @@ export const UsersPage: React.FC = () => {
   const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  useEffect(() => {
+  const fetchUsers = useCallback(() => {
+    setLoading(true);
     apiFetch('/api/v1/admin/users')
       .then((data: any) => {
         setUsers(Array.isArray(data) ? data : data.users || []);
@@ -32,6 +35,29 @@ export const UsersPage: React.FC = () => {
       })
       .finally(() => setLoading(false));
   }, [apiFetch]);
+
+  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+
+  const handleAction = async (userId: string, action: 'suspend' | 'activate' | 'delete') => {
+    setActionLoading(userId);
+    setActionError(null);
+    try {
+      if (action === 'delete') {
+        if (!confirm(`Are you sure you want to delete user ${userId}?`)) return;
+        await apiFetch(`/api/v1/admin/users/${userId}`, { method: 'DELETE' });
+      } else {
+        await apiFetch(`/api/v1/admin/users/${userId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: action === 'suspend' ? 'suspended' : 'active' }),
+        });
+      }
+      fetchUsers();
+    } catch (err: any) {
+      setActionError(err.message || `Failed to ${action} user`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   const filtered = useMemo(() => {
     return users.filter((u) => {
@@ -49,13 +75,17 @@ export const UsersPage: React.FC = () => {
       <div className="space-y-6">
         <div>
           <h2 className="text-xl font-bold text-white">User Management</h2>
-          <p className="text-sm text-slate-400 mt-1">This feature is coming in Phase 5</p>
+          <p className="text-sm text-slate-400 mt-1">Failed to load user data</p>
         </div>
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 flex flex-col items-center text-center">
-          <AlertTriangle size={40} className="text-slate-600 mb-4" />
-          <p className="text-slate-400 text-sm max-w-md">
-            User management features are under development. Check back after the next release.
-          </p>
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-8 flex flex-col items-center text-center">
+          <AlertTriangle size={40} className="text-red-400 mb-4" />
+          <p className="text-red-400 text-sm max-w-md">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded text-sm transition-colors"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
@@ -64,6 +94,7 @@ export const UsersPage: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64 text-slate-500">
+        <Loader2 size={20} className="animate-spin mr-2" />
         <span>Loading users...</span>
       </div>
     );
@@ -74,9 +105,15 @@ export const UsersPage: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-white">Users</h2>
-          <p className="text-sm text-slate-400 mt-1">Manage user accounts</p>
+          <p className="text-sm text-slate-400 mt-1">{users.length} total accounts</p>
         </div>
       </div>
+
+      {actionError && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded p-3 text-sm text-red-400">
+          {actionError}
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-3 items-center">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
@@ -96,7 +133,6 @@ export const UsersPage: React.FC = () => {
         >
           <option value="all">All Roles</option>
           <option value="admin">Admin</option>
-          <option value="moderator">Moderator</option>
           <option value="user">User</option>
         </select>
         <select
@@ -107,7 +143,7 @@ export const UsersPage: React.FC = () => {
           <option value="all">All Status</option>
           <option value="active">Active</option>
           <option value="suspended">Suspended</option>
-          <option value="pending">Pending</option>
+          <option value="deleted">Deleted</option>
         </select>
       </div>
 
@@ -121,13 +157,14 @@ export const UsersPage: React.FC = () => {
                 <th className="text-left py-3 px-4 text-slate-400 font-medium">Role</th>
                 <th className="text-left py-3 px-4 text-slate-400 font-medium">Status</th>
                 <th className="text-left py-3 px-4 text-slate-400 font-medium">Created</th>
+                <th className="text-left py-3 px-4 text-slate-400 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((u) => (
                 <tr key={u.id} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
                   <td className="py-3 px-4 text-white font-mono text-xs">{u.email}</td>
-                  <td className="py-3 px-4 text-slate-300">{u.name}</td>
+                  <td className="py-3 px-4 text-slate-300">{u.name || '—'}</td>
                   <td className="py-3 px-4">
                     <span className="px-2 py-0.5 rounded text-xs font-medium border bg-slate-500/10 text-slate-400 border-slate-500/30 capitalize">
                       {u.role}
@@ -139,12 +176,45 @@ export const UsersPage: React.FC = () => {
                         ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                         : u.status === 'suspended'
                         ? 'bg-red-500/10 text-red-400 border-red-500/30'
+                        : u.status === 'deleted'
+                        ? 'bg-slate-500/10 text-slate-500 border-slate-500/30'
                         : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
                     }`}>
                       {u.status}
                     </span>
                   </td>
                   <td className="py-3 px-4 text-slate-500 text-xs">{new Date(u.created_at).toLocaleDateString()}</td>
+                  <td className="py-3 px-4">
+                    <div className="flex items-center gap-1">
+                      {u.status === 'active' ? (
+                        <button
+                          onClick={() => handleAction(u.id, 'suspend')}
+                          disabled={actionLoading === u.id}
+                          title="Suspend"
+                          className="p-1.5 text-slate-500 hover:text-yellow-400 hover:bg-yellow-500/10 rounded transition-colors"
+                        >
+                          <Ban size={14} />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleAction(u.id, 'activate')}
+                          disabled={actionLoading === u.id}
+                          title="Activate"
+                          className="p-1.5 text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded transition-colors"
+                        >
+                          <CheckCircle size={14} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleAction(u.id, 'delete')}
+                        disabled={actionLoading === u.id}
+                        title="Delete"
+                        className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

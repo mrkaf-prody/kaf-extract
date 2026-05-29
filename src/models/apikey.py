@@ -1,19 +1,49 @@
-"""API Key verification — database-backed with bcrypt."""
+"""API Key verification — database-backed with bcrypt (SHA-256 + bcrypt).
+
+Backward compatible: tries SHA-256+bcrypt first, falls back to direct bcrypt
+for keys hashed before the migration.
+"""
 
 import asyncio
+import hashlib
 from datetime import UTC, datetime
 
-from passlib.context import CryptContext
+import bcrypt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db import async_session_factory
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 # In-memory fallback for backward compat during transition
 # Format: {hashed_key: {"label": "dev-key", "rate_limit": 100}}
 _fallback_keys: dict[str, dict] = {}
+
+
+def _sha256(value: str) -> bytes:
+    return hashlib.sha256(value.encode("utf-8")).digest()
+
+
+def _hash_token(raw: str) -> str:
+    """SHA-256 + bcrypt (for new keys)."""
+    digest = _sha256(raw)
+    return bcrypt.hashpw(digest, bcrypt.gensalt(rounds=12)).decode("utf-8")
+
+
+def _verify_token(raw: str, hashed: str) -> bool:
+    """Verify SHA-256 + bcrypt hash."""
+    try:
+        digest = _sha256(raw)
+        return bcrypt.checkpw(digest, hashed.encode("utf-8"))
+    except Exception:
+        return False
+
+
+def _verify_direct(raw: str, hashed: str) -> bool:
+    """Verify direct bcrypt hash (legacy keys pre-migration)."""
+    try:
+        return bcrypt.checkpw(raw.encode("utf-8"), hashed.encode("utf-8"))
+    except Exception:
+        return False
 
 
 def _register_dev_key() -> None:
@@ -22,13 +52,12 @@ def _register_dev_key() -> None:
     if settings.dev_api_key in _fallback_keys:
         return
     try:
-        _fallback_keys[pwd_context.hash(settings.dev_api_key)] = {
+        _fallback_keys[_hash_token(settings.dev_api_key)] = {
             "label": "dev-default",
             "rate_limit": 100,
             "tier": "hobby",
         }
     except Exception:
-        # passlib + bcrypt compatibility issue — use raw key as fallback
         _fallback_keys[settings.dev_api_key] = {
             "label": "dev-default",
             "rate_limit": 100,
@@ -41,16 +70,13 @@ _register_dev_key()
 
 def _verify_in_memory(key: str) -> dict | None:
     """Check fallback in-memory keys (dev key)."""
-    # First check raw key fallback (for bcrypt compatibility issues)
+    # First check raw key fallback
     if key in _fallback_keys:
         return _fallback_keys[key]
-    # Then try bcrypt verification
+    # Try new hash verification
     for hashed, meta in _fallback_keys.items():
-        try:
-            if pwd_context.verify(key, hashed):
-                return meta
-        except Exception:
-            continue
+        if _verify_token(key, hashed) or _verify_direct(key, hashed):
+            return meta
     return None
 
 
@@ -78,7 +104,8 @@ async def verify_api_key(key: str) -> dict | None:
             rows = result.all()
 
             for api_key, user in rows:
-                if pwd_context.verify(key, api_key.key_hash):
+                # Try new SHA-256+bcrypt first, then legacy direct bcrypt
+                if _verify_token(key, api_key.key_hash) or _verify_direct(key, api_key.key_hash):
                     # Update last_used_at
                     api_key.last_used_at = datetime.now(UTC)
                     await session.commit()

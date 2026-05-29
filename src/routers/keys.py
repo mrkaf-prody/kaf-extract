@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from passlib.context import CryptContext
+from src.utils.bcrypt_utils import hash_token, verify_token
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,8 +27,6 @@ from src.middleware.auth import admin_required, get_current_user
 from src.models.sql_models import ApiKey, User
 
 router = APIRouter(tags=["keys"])
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 # ---------------------------------------------------------------------------
@@ -105,8 +103,8 @@ def _generate_api_key() -> str:
 
 
 def _hash_api_key(raw_key: str) -> str:
-    """Hash an API key using bcrypt."""
-    return pwd_context.hash(raw_key)
+    """Hash an API key using SHA-256 + bcrypt."""
+    return hash_token(raw_key)
 
 
 def _model_to_item(api_key: ApiKey, user: User | None = None) -> ApiKeyItem:
@@ -339,6 +337,42 @@ async def list_my_keys(
     rows = result.all()
 
     return [_model_to_item(ak, u) for ak, u in rows]
+
+
+@router.delete("/keys/{key_id}", response_model=MessageResponse)
+async def revoke_my_key(
+    key_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Revoke an API key belonging to the current user."""
+    try:
+        kid = uuid.UUID(key_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid key_id UUID format",
+        )
+
+    user_id = current_user["user_id"]
+    result = await db.execute(
+        select(ApiKey).where(ApiKey.id == kid, ApiKey.user_id == user_id)
+    )
+    api_key = result.scalar_one_or_none()
+
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="API key not found",
+        )
+
+    if api_key.status == "revoked":
+        return MessageResponse(message="API key was already revoked")
+
+    api_key.status = "revoked"
+    await db.flush()
+
+    return MessageResponse(message=f"API key '{api_key.label}' has been revoked")
 
 
 # ---------------------------------------------------------------------------

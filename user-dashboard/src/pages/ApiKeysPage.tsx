@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Key, Plus, Copy, Trash2, Check, X } from 'lucide-react';
+import { Key, Plus, Copy, Trash2, Check, X, AlertTriangle } from 'lucide-react';
 
 interface KeyItem {
   id: string;
@@ -15,7 +15,7 @@ interface KeyItem {
 }
 
 export const ApiKeysPage: React.FC = () => {
-  const { apiFetch, showError } = useAuth();
+  const { apiFetch } = useAuth();
   const [keys, setKeys] = useState<KeyItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -23,20 +23,25 @@ export const ApiKeysPage: React.FC = () => {
   const [creating, setCreating] = useState(false);
   const [newKeyRaw, setNewKeyRaw] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   const fetchKeys = useCallback(() => {
     setLoading(true);
+    setError('');
     apiFetch('/api/v1/keys')
       .then(data => setKeys(Array.isArray(data) ? data : data.keys || []))
-      .catch((err: any) => showError(err.message || 'Failed to load API keys'))
+      .catch((err: any) => setError(err.message || 'Failed to load keys'))
       .finally(() => setLoading(false));
-  }, [apiFetch, showError]);
+  }, [apiFetch]);
 
   useEffect(() => { fetchKeys(); }, [fetchKeys]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newLabel.trim()) return;
+    setError('');
+    setSuccessMsg('');
     setCreating(true);
     try {
       const res = await apiFetch('/api/v1/keys', {
@@ -46,9 +51,10 @@ export const ApiKeysPage: React.FC = () => {
       setNewKeyRaw(res.api_key || '');
       setNewLabel('');
       setShowCreate(false);
+      setSuccessMsg('Key created successfully. Copy it now — it will not be shown again.');
       fetchKeys();
     } catch (err: any) {
-      showError(err.message || 'Failed to create key');
+      setError(err.message || 'Failed to create key');
     } finally {
       setCreating(false);
     }
@@ -56,11 +62,13 @@ export const ApiKeysPage: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to revoke this API key?')) return;
+    setError('');
     try {
       await apiFetch(`/api/v1/keys/${id}`, { method: 'DELETE' });
+      setSuccessMsg('Key revoked successfully.');
       fetchKeys();
     } catch (err: any) {
-      showError(err.message || 'Failed to delete key');
+      setError(err.message || 'Failed to delete key');
     }
   };
 
@@ -78,13 +86,30 @@ export const ApiKeysPage: React.FC = () => {
           <p className="text-slate-400 text-sm">Manage your API keys for programmatic access.</p>
         </div>
         <button
-          onClick={() => { setShowCreate(true); setNewKeyRaw(null); }}
+          onClick={() => { setShowCreate(true); setNewKeyRaw(null); setError(''); setSuccessMsg(''); }}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded px-4 py-2 text-sm font-medium transition-colors"
         >
           <Plus size={16} />
           Create Key
         </button>
       </div>
+
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded p-3 text-sm text-red-400 mb-4 flex items-center gap-2">
+          <AlertTriangle size={16} />
+          {error}
+        </div>
+      )}
+
+      {successMsg && (
+        <div className="bg-green-500/10 border border-green-500/30 rounded p-3 text-sm text-green-400 mb-4 flex items-center gap-2">
+          <Check size={16} />
+          {successMsg}
+          <button onClick={() => setSuccessMsg('')} className="ml-auto text-slate-500 hover:text-slate-300">
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* New key raw display */}
       {newKeyRaw && (

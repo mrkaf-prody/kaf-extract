@@ -12,7 +12,7 @@ from io import BytesIO
 import pyotp
 import qrcode
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from passlib.context import CryptContext
+from src.utils.bcrypt_utils import hash_password, verify_password, hash_token, verify_token
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,8 +35,6 @@ from src.utils.crypto import (
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 # --- Request / Response Schemas ---
@@ -121,19 +119,11 @@ class AdminResetResponse(BaseModel):
 # --- Helpers ---
 
 def _hash_password(password: str) -> str:
-    try:
-        return pwd_context.hash(password)
-    except Exception:
-        import bcrypt
-        return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    return hash_password(password)
 
 
 def _verify_password(plain: str, hashed: str) -> bool:
-    try:
-        return pwd_context.verify(plain, hashed)
-    except Exception:
-        import bcrypt
-        return bcrypt.checkpw(plain.encode(), hashed.encode())
+    return verify_password(plain, hashed)
 
 
 async def _create_token_response(
@@ -162,11 +152,7 @@ async def _store_refresh_token(
     db: AsyncSession, user_id: uuid.UUID, raw_token: str
 ) -> None:
     """Hash and store a refresh token in the database."""
-    try:
-        token_hash = pwd_context.hash(raw_token)
-    except Exception:
-        import bcrypt
-        token_hash = bcrypt.hashpw(raw_token.encode(), bcrypt.gensalt()).decode()
+    token_hash = hash_token(raw_token)
     expires_at = datetime.now(UTC) + timedelta(days=settings.jwt_refresh_expire_days)
     rt = RefreshToken(
         id=uuid.uuid4(),
@@ -214,7 +200,7 @@ async def _validate_and_consume_refresh_token(
     )
     found = False
     for rt in all_tokens.scalars():
-        if pwd_context.verify(raw_token, rt.token_hash):
+        if verify_token(raw_token, rt.token_hash):
             # Valid — consume (delete) this token
             await db.delete(rt)
             found = True
@@ -261,7 +247,7 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
         from src.services.trials import start_trial
         await start_trial(db, user.id)
     except ValueError:
-        pass  # Already has a trial — non-fatal
+        pass  # User already has a trial — fine
     except Exception as exc:
         import logging
         logging.getLogger(__name__).warning(
