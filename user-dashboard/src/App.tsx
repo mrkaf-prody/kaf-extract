@@ -11,7 +11,8 @@ import { BillingPage } from './pages/BillingPage';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-  if (loading) {
+  // Show cached user immediately, don't block if we have data
+  if (loading && !user) {
     return (
       <div className="flex items-center justify-center h-screen text-[#9a9aae] bg-[#06060a]">
         <div className="w-8 h-8 border-2 border-[#00d4a0] border-t-transparent rounded-full animate-spin mr-3"></div>

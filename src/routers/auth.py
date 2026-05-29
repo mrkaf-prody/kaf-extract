@@ -48,6 +48,7 @@ class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    user: UserResponse | None = None
 
 
 class UserResponse(BaseModel):
@@ -113,15 +114,24 @@ def _verify_password(plain: str, hashed: str) -> bool:
 
 
 async def _create_token_response(
-    db: AsyncSession, user_id: uuid.UUID, email: str, role: str
+    db: AsyncSession, user: User
 ) -> TokenResponse:
-    """Create access + refresh tokens, store refresh token, return response."""
-    access_token = create_access_token(str(user_id), email, role)
-    refresh_token = create_refresh_token(str(user_id))
-    await _store_refresh_token(db, user_id, refresh_token)
+    """Create access + refresh tokens, store refresh token, return response with user."""
+    access_token = create_access_token(str(user.id), user.email, user.role)
+    refresh_token = create_refresh_token(str(user.id))
+    await _store_refresh_token(db, user.id, refresh_token)
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
+        user=UserResponse(
+            id=str(user.id),
+            email=user.email,
+            name=user.name,
+            role=user.role,
+            status=user.status,
+            totp_enabled=bool(user.totp_secret),
+            created_at=user.created_at.isoformat() if user.created_at else "",
+        ),
     )
 
 
@@ -231,7 +241,7 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
         pass  # Non-fatal — user can still use the service
 
     # Generate tokens
-    return await _create_token_response(db, user.id, user.email, user.role)
+    return await _create_token_response(db, user)
 
 
 class LoginChallenge(BaseModel):
@@ -265,7 +275,7 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     if user.totp_secret:
         return LoginChallenge()
 
-    return await _create_token_response(db, user.id, user.email, user.role)
+    return await _create_token_response(db, user)
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -282,7 +292,7 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
             detail="User not found or inactive",
         )
 
-    return await _create_token_response(db, user.id, user.email, user.role)
+    return await _create_token_response(db, user)
 
 
 @router.get("/me", response_model=UserResponse)
@@ -480,7 +490,7 @@ async def login_2fa(
             detail="Invalid TOTP code.",
         )
 
-    return await _create_token_response(db, user.id, user.email, user.role)
+    return await _create_token_response(db, user)
 
 
 # --- Admin Endpoints ---

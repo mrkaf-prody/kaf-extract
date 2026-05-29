@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Zap, LogIn, Loader2, AlertCircle } from 'lucide-react';
 export const LoginPage = () => {
   const { login } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -14,8 +15,10 @@ export const LoginPage = () => {
     setSubmitting(true);
     try {
       await login(email, password);
+      navigate('/dashboard', { replace: true });
     } catch (err: any) {
       setError(err.message || 'Login failed');
+    } finally {
       setSubmitting(false);
     }
   };
