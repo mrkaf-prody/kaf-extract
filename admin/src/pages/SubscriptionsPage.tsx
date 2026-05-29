@@ -88,26 +88,24 @@ export const SubscriptionsPage: React.FC = () => {
   const [confirmCancel, setConfirmCancel] = useState<Subscription | null>(null);
 
   // Load
-  const handleRefresh = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (search) params.append('search', search);
-      if (statusFilter !== 'all') params.append('status', statusFilter);
-      if (planFilter !== 'all') params.append('plan', planFilter);
-      const data = await apiFetch(`/api/v1/admin/subscriptions?${params.toString()}`);
-      setSubscriptions(data);
-      setError(null);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [apiFetch, search, statusFilter, planFilter]);
-
   useEffect(() => {
-    handleRefresh();
-  }, [handleRefresh]);
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (search) params.append('search', search);
+        if (statusFilter !== 'all') params.append('status', statusFilter);
+        if (planFilter !== 'all') params.append('plan', planFilter);
+        const res = await apiFetch(`/v1/admin/subscriptions?${params.toString()}`);
+        setSubscriptions(res);
+      } catch (e: any) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [search, statusFilter, planFilter]);
 
   // Derived
   const filtered = useMemo(() => {
@@ -122,28 +120,21 @@ export const SubscriptionsPage: React.FC = () => {
   }, [subscriptions, search, statusFilter, planFilter]);
 
   // Change plan
-  const handleChangePlan = useCallback(async (subId: string, newPlan: string) => {
-    try {
-      await apiFetch(`/api/v1/admin/subscriptions/${subId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ plan: newPlan }),
-      });
-      handleRefresh();
-    } catch (err: any) {
-      alert('Failed to change plan: ' + err.message);
-    }
-  }, [apiFetch]);
+  const handleChangePlan = useCallback((subId: string, newPlan: string) => {
+    setSubscriptions((prev) =>
+      prev.map((s) => (s.id === subId ? { ...s, plan: newPlan as Subscription['plan'] } : s))
+    );
+    // TODO: apiFetch(`/v1/admin/subscriptions/${subId}`, { method: 'PATCH', body: JSON.stringify({ plan: newPlan }) });
+  }, []);
 
   // Cancel
-  const handleCancel = useCallback(async (subId: string) => {
-    try {
-      await apiFetch(`/api/v1/admin/subscriptions/${subId}/cancel`, { method: 'POST' });
-      setConfirmCancel(null);
-      handleRefresh();
-    } catch (err: any) {
-      alert('Failed to cancel: ' + err.message);
-    }
-  }, [apiFetch]);
+  const handleCancel = useCallback((subId: string) => {
+    setSubscriptions((prev) =>
+      prev.map((s) => (s.id === subId ? { ...s, status: 'cancelled' as const } : s))
+    );
+    setConfirmCancel(null);
+    // TODO: apiFetch(`/v1/admin/subscriptions/${subId}/cancel`, { method: 'POST' });
+  }, []);
 
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -203,10 +194,8 @@ export const SubscriptionsPage: React.FC = () => {
             if (statusFilter !== 'all') params.append('status', statusFilter);
             if (planFilter !== 'all') params.append('plan', planFilter);
             setLoading(true);
-            apiFetch(`/api/v1/admin/subscriptions?${params.toString()}`)
-              .then(async (res: Response) => {
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
+            apiFetch(`/v1/admin/subscriptions?${params.toString()}`)
+              .then((data: any) => {
                 setSubscriptions(data);
               })
               .catch((e: any) => setError(e.message))

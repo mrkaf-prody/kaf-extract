@@ -3,16 +3,12 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AdminLayout } from './components/AdminLayout';
 import { LoginPage } from './pages/LoginPage';
-import { DashboardPage } from './pages/DashboardPage';
+import { OverviewPage } from './pages/OverviewPage';
 import { UsersPage } from './pages/UsersPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { SubscriptionsPage } from './pages/SubscriptionsPage';
 import { VouchersPage } from './pages/VouchersPage';
-import { MonitorPage } from './pages/MonitorPage';
-import { FeaturesPage } from './pages/FeaturesPage';
-import { AnalyticsPage } from './pages/AnalyticsPage';
 import { PaymentsPage } from './pages/PaymentsPage';
-import { AuditLogsPage } from './pages/AuditLogsPage';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -40,16 +36,12 @@ const App = () => (
             </ProtectedRoute>
           }
         >
-          <Route index element={<DashboardPage />} />
+          <Route index element={<OverviewPage />} />
           <Route path="users" element={<UsersPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="subscriptions" element={<SubscriptionsPage />} />
           <Route path="vouchers" element={<VouchersPage />} />
-          <Route path="monitor" element={<MonitorPage />} />
-          <Route path="features" element={<FeaturesPage />} />
-          <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="payments" element={<PaymentsPage />} />
-          <Route path="logs" element={<AuditLogsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/admin" />} />
       </Routes>

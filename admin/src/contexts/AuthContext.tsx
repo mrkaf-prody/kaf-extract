@@ -100,14 +100,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     if (currentToken) headers['Authorization'] = `Bearer ${currentToken}`;
     if (!(opts.body instanceof FormData)) headers['Content-Type'] = 'application/json';
-    const res = await fetch(`${API_BASE}${path}`, { ...opts, headers });
+
+    // Normalize legacy /v1/* paths to /api/v1/* so backend matches
+    const normalizedPath = path.startsWith('/v1/') ? `/api${path}` : path;
+
+    const res = await fetch(`${API_BASE}${normalizedPath}`, { ...opts, headers });
     if (res.status === 401) {
       logout();
       throw new Error('Session expired');
     }
     if (!res.ok) {
       const e = await res.json().catch(() => ({ detail: 'Request failed' }));
-      throw new Error(e.detail);
+      throw new Error(e.detail || 'Request failed');
     }
     return res.json();
   }, []);

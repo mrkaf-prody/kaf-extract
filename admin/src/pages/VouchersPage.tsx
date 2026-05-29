@@ -185,8 +185,9 @@ export const VouchersPage: React.FC = () => {
   // ─── Export CSV ───
   const handleExportCSV = useCallback(async () => {
     try {
+      // apiFetch returns parsed JSON; for blob downloads we use raw fetch with auth header
       const token = localStorage.getItem('access_token');
-      const res = await fetch('/api/v1/admin/vouchers/export', {
+      const res = await fetch('https://extract.kafcenter.com/api/v1/admin/vouchers/export', {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Export failed');
