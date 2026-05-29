@@ -650,27 +650,6 @@ async def admin_reset(
     )
 
 
-@router.post("/admin/reset-temp", include_in_schema=False)
-async def admin_reset_temp(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-):
-    """One-time admin password reset — TEMPORARY, will be removed after use."""
-    secret = request.query_params.get("secret", "")
-    if secret != "cef1e04af5a4eef3dd315ae078a52eef":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid secret")
-
-    result = await db.execute(select(User).where(User.email == "admin@kafcenter.com"))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admin user not found")
-
-    new_password = "KafExtract2026!Admin"
-    user.password_hash = _hash_password(new_password)
-    await db.commit()
-    return {"message": "Admin password reset", "email": "admin@kafcenter.com"}
-
-
 @router.post("/admin/init-reset", include_in_schema=False)
 async def admin_init_reset(
     request: Request,

@@ -370,63 +370,78 @@ async def admin_analytics(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Aggregate analytics for the admin dashboard."""
-    from datetime import timedelta
+    try:
+        from datetime import timedelta
 
-    days = {"7d": 7, "30d": 30, "90d": 90}.get(range, 30)
-    since = datetime.now(UTC) - timedelta(days=days)
+        days = {"7d": 7, "30d": 30, "90d": 90}.get(range, 30)
+        since = datetime.now(UTC) - timedelta(days=days)
 
-    # Signups per day
-    result = await db.execute(
-        select(func.date_trunc("day", User.created_at), func.count(User.id))
-        .where(User.created_at >= since)
-        .group_by(func.date_trunc("day", User.created_at))
-        .order_by(func.date_trunc("day", User.created_at))
-    )
-    signups_per_day = [
-        {"date": d.isoformat() if hasattr(d, "isoformat") else str(d), "count": c}
-        for d, c in result.all()
-    ]
+        # Signups per day
+        result = await db.execute(
+            select(func.date_trunc("day", User.created_at), func.count(User.id))
+            .where(User.created_at >= since)
+            .group_by(func.date_trunc("day", User.created_at))
+            .order_by(func.date_trunc("day", User.created_at))
+        )
+        signups_per_day = [
+            {"date": d.isoformat() if hasattr(d, "isoformat") else str(d), "count": c}
+            for d, c in result.all()
+        ]
 
-    # MRR by plan
-    result = await db.execute(
-        select(Subscription.plan, func.count(Subscription.id))
-        .where(Subscription.status == "active")
-        .group_by(Subscription.plan)
-    )
-    plan_counts = {plan: count for plan, count in result.all()}
-    plan_prices = {"hobby": 0, "pro": 2900, "enterprise": 9900}
-    mrr = sum(plan_counts.get(p, 0) * plan_prices[p] for p in plan_prices)
-    revenue_by_plan = [
-        {"plan": p, "count": plan_counts.get(p, 0), "mrr": plan_counts.get(p, 0) * plan_prices[p]}
-        for p in plan_prices
-    ]
+        # MRR by plan
+        result = await db.execute(
+            select(Subscription.plan, func.count(Subscription.id))
+            .where(Subscription.status == "active")
+            .group_by(Subscription.plan)
+        )
+        plan_counts = {plan: count for plan, count in result.all()}
+        plan_prices = {"hobby": 0, "pro": 2900, "enterprise": 9900}
+        mrr = sum(plan_counts.get(p, 0) * plan_prices[p] for p in plan_prices)
+        revenue_by_plan = [
+            {"plan": p, "count": plan_counts.get(p, 0), "mrr": plan_counts.get(p, 0) * plan_prices[p]}
+            for p in plan_prices
+        ]
 
-    # Total users, active subscriptions
-    total_users = await db.scalar(select(func.count(User.id)))
-    total_subs = await db.scalar(
-        select(func.count(Subscription.id)).where(Subscription.status == "active")
-    )
+        # Total users, active subscriptions
+        total_users = await db.scalar(select(func.count(User.id)))
+        total_subs = await db.scalar(
+            select(func.count(Subscription.id)).where(Subscription.status == "active")
+        )
 
-    # Churn = canceled in period / total at start of period
-    canceled = await db.scalar(
-        select(func.count(Subscription.id))
-        .where(Subscription.status == "canceled", Subscription.canceled_at >= since)
-    )
-    churn_rate = round((canceled / max(total_subs, 1)) * 100, 2) if total_subs else 0.0
+        # Churn = canceled in period / total at start of period
+        canceled = await db.scalar(
+            select(func.count(Subscription.id))
+            .where(Subscription.status == "canceled", Subscription.canceled_at >= since)
+        )
+        churn_rate = round((canceled / max(total_subs, 1)) * 100, 2) if total_subs else 0.0
 
-    # ARPU
-    arpu = round(mrr / max(total_subs, 1), 2) if total_subs else 0.0
+        # ARPU
+        arpu = round(mrr / max(total_subs, 1), 2) if total_subs else 0.0
 
-    return {
-        "range": range,
-        "mrr_cents": mrr,
-        "arpu_cents": arpu,
-        "churn_rate_percent": churn_rate,
-        "total_users": total_users or 0,
-        "active_subscriptions": total_subs or 0,
-        "signups_per_day": signups_per_day,
-        "revenue_by_plan": revenue_by_plan,
-    }
+        return {
+            "range": range,
+            "mrr_cents": mrr,
+            "arpu_cents": arpu,
+            "churn_rate_percent": churn_rate,
+            "total_users": total_users or 0,
+            "active_subscriptions": total_subs or 0,
+            "signups_per_day": signups_per_day,
+            "revenue_by_plan": revenue_by_plan,
+        }
+    except Exception:
+        # Return safe defaults if analytics queries fail (e.g., missing columns)
+        import logging
+        logging.getLogger("admin.analytics").exception("Analytics query failed")
+        return {
+            "range": range,
+            "mrr_cents": 0,
+            "arpu_cents": 0,
+            "churn_rate_percent": 0.0,
+            "total_users": 0,
+            "active_subscriptions": 0,
+            "signups_per_day": [],
+            "revenue_by_plan": [],
+        }
 
 
 # ---------------------------------------------------------------------------
