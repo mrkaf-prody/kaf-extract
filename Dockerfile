@@ -15,7 +15,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Crawl4AI browsers (bundled Playwright Chromium)
+# Install Crawl4AI browsers
 RUN python3 -m crawl4ai install 2>/dev/null || python3 -m playwright install chromium
 
 # Build user dashboard React SPA
@@ -24,10 +24,21 @@ RUN cd user-dashboard && npm install
 COPY user-dashboard/ ./user-dashboard/
 RUN cd user-dashboard && npm run build
 
+# Build admin dashboard React SPA
+COPY admin/package.json admin/package-lock.json* ./admin/
+RUN cd admin && npm install
+COPY admin/ ./admin/
+RUN cd admin && npm run build
+
+# Copy application source code
 COPY src/ ./src/
 COPY alembic.ini .
 COPY alembic/ ./alembic/
 RUN mkdir -p /app/data
+
+# After src/ copy, overwrite admin_static with the freshly built admin dashboard
+# This ensures src/admin_static contains the latest build regardless of git state
+RUN rm -rf src/admin_static/* && cp -r admin/dist/* src/admin_static/
 
 EXPOSE 8000
 
