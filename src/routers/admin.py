@@ -542,9 +542,17 @@ async def list_feature_flags(
     ]
 
 
+class CreateFeatureFlagRequest(BaseModel):
+    key: str
+    name: str
+    description: str | None = None
+    default_enabled: bool = True
+    requires_plan: str | None = None
+
+
 @router.post("/features", response_model=FeatureFlagItem)
 async def create_feature_flag(
-    body: FeatureFlagItem,
+    body: CreateFeatureFlagRequest,
     admin_user: dict = Depends(admin_required),
     db: AsyncSession = Depends(get_db),
 ):
