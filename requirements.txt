@@ -10,6 +10,7 @@ bcrypt==4.0.1
 python-multipart==0.0.18
 lxml>=5.0.0
 beautifulsoup4>=4.12.0
+qrcode[pil]>=7.4
 # Database
 sqlalchemy[asyncio]>=2.0.30
 asyncpg>=0.29.0
