@@ -20,6 +20,76 @@ def _run_migrations_sync(connection, alembic_cfg):
     command.upgrade(alembic_cfg, "head")
 
 
+# ── Platform-defined feature flags ────────────────────────────────────────
+# These are seeded on startup. Admins can toggle on/off and assign to plans.
+# No plan binding by default — admin assigns via the Plans tab.
+
+PLATFORM_FEATURE_FLAGS = [
+    # Core Extraction
+    {"key": "css_extraction", "name": "CSS Selector Extraction", "description": "Extract text, HTML, attributes, and existence checks via CSS selectors", "default_enabled": True},
+    {"key": "ai_extraction", "name": "AI-Powered Extraction", "description": "LLM-based extraction using natural language instructions", "default_enabled": True},
+    {"key": "markdown_extraction", "name": "Markdown Extraction", "description": "Convert any web page to clean markdown content", "default_enabled": True},
+    {"key": "screenshot_capture", "name": "Screenshot Capture", "description": "Full-page screenshots as base64-encoded images", "default_enabled": True},
+    {"key": "batch_extraction", "name": "Batch Extraction", "description": "Extract from multiple URLs in a single request (up to 50)", "default_enabled": True},
+    {"key": "async_extraction", "name": "Async Extraction", "description": "Non-blocking extraction with job queue and polling", "default_enabled": True},
+    {"key": "webhook_callbacks", "name": "Webhook Callbacks", "description": "HMAC-SHA256 signed result delivery to custom endpoints", "default_enabled": True},
+    # Scheduling & Automation
+    {"key": "scheduled_extractions", "name": "Scheduled Extractions", "description": "Cron-based recurring extractions (hourly, daily, weekly)", "default_enabled": True},
+    # Export & Integrations
+    {"key": "csv_export", "name": "CSV Export", "description": "Export extracted data as CSV files", "default_enabled": True},
+    {"key": "slack_integration", "name": "Slack Notifications", "description": "Send extraction results to Slack via webhook", "default_enabled": True},
+    # API & Developer Tools
+    {"key": "api_access", "name": "REST API Access", "description": "Full REST API with 43+ endpoints and OpenAPI docs", "default_enabled": True},
+    {"key": "python_sdk", "name": "Python SDK", "description": "pip install kaf-extract — full Python client library", "default_enabled": True},
+    {"key": "javascript_sdk", "name": "JavaScript SDK", "description": "npm install kaf-extract — full JS/TypeScript client library", "default_enabled": True},
+    {"key": "api_docs", "name": "Interactive API Docs", "description": "Swagger/OpenAPI UI for testing and exploration", "default_enabled": True},
+    # Security
+    {"key": "two_factor_auth", "name": "Two-Factor Authentication", "description": "TOTP-based 2FA with QR code setup and backup codes", "default_enabled": True},
+    # Collaboration
+    {"key": "organizations", "name": "Organizations & Teams", "description": "Team management with roles (owner, admin, member, viewer)", "default_enabled": True},
+    # Billing & Subscription
+    {"key": "trial_system", "name": "Free Trial", "description": "7-day free trial with 100 extractions for new users", "default_enabled": True},
+    {"key": "voucher_system", "name": "Voucher Codes", "description": "Create, redeem, and manage discount voucher codes", "default_enabled": True},
+    {"key": "invoice_generation", "name": "Invoice Generation", "description": "Automatic PDF invoice generation for payments", "default_enabled": True},
+    # User Dashboard
+    {"key": "extraction_history", "name": "Extraction History", "description": "View and search past extractions with pagination", "default_enabled": True},
+    {"key": "usage_dashboard", "name": "Usage Dashboard", "description": "Real-time extraction counts, limits, and remaining quota", "default_enabled": True},
+    # Admin
+    {"key": "admin_analytics", "name": "Admin Analytics", "description": "Platform-wide extraction stats, MRR, revenue by plan, error rates", "default_enabled": True},
+]
+
+
+async def _seed_feature_flags():
+    """Seed platform-defined feature flags into the database (idempotent)."""
+    from sqlalchemy import select
+    from src.db import async_session_factory
+    from src.models.sql_models import FeatureFlag
+
+    async with async_session_factory() as session:
+        for flag_data in PLATFORM_FEATURE_FLAGS:
+            result = await session.execute(
+                select(FeatureFlag).where(FeatureFlag.key == flag_data["key"])
+            )
+            existing = result.scalar_one_or_none()
+            if not existing:
+                flag = FeatureFlag(
+                    key=flag_data["key"],
+                    name=flag_data["name"],
+                    description=flag_data["description"],
+                    default_enabled=flag_data["default_enabled"],
+                    requires_plan=None,  # No plan binding — admin assigns later
+                )
+                session.add(flag)
+        await session.commit()
+
+    # Count how many were seeded vs already existed
+    async with async_session_factory() as session:
+        result = await session.execute(select(FeatureFlag))
+        total = len(result.scalars().all())
+    import sys
+    print(f"Feature flags: {total} total in database ({len(PLATFORM_FEATURE_FLAGS)} platform-defined)", file=sys.stderr)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup/shutdown lifecycle — init Redis, verify Crawl4AI, init DB."""
@@ -48,6 +118,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         import sys
         print(f"WARNING: Auto table creation failed (non-fatal): {e}", file=sys.stderr)
+
+    # Seed feature flags (platform-defined, idempotent)
+    try:
+        await _seed_feature_flags()
+    except Exception as e:
+        import sys
+        print(f"WARNING: Feature flags seeding failed (non-fatal): {e}", file=sys.stderr)
 
     # Connect Redis (caching + rate limiter + job queue)
     try:
