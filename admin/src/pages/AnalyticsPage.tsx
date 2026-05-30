@@ -25,62 +25,6 @@ interface AnalyticsData {
   signups_per_day: { date: string; signups: number }[];
 }
 
-// ─── Mock data generators (REMOVE after confirming API works) ───
-
-function generateMRRData(range: TimeRange): { date: string; mrr: number }[] {
-  const days = range === '7d' ? 7 : range === '30d' ? 30 : 90;
-  const data: { date: string; mrr: number }[] = [];
-  let mrr = 42000;
-  const now = new Date();
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    mrr += Math.floor((Math.random() - 0.35) * 800);
-    if (mrr < 38000) mrr = 38000;
-    data.push({
-      date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      mrr: Math.round(mrr),
-    });
-  }
-  return data;
-}
-
-function generateSignupsData(range: TimeRange): { date: string; signups: number }[] {
-  const days = range === '7d' ? 7 : range === '30d' ? 30 : 90;
-  const data: { date: string; signups: number }[] = [];
-  const now = new Date();
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    // More signups on weekdays
-    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-    data.push({
-      date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      signups: Math.floor(Math.random() * (isWeekend ? 20 : 45)) + (isWeekend ? 5 : 15),
-    });
-  }
-  return data;
-}
-
-function generateMockAnalytics(range: TimeRange): AnalyticsData {
-  return {
-    mrr: 45230,
-    arpu: 34.21,
-    churn_rate: 3.8,
-    trial_conversion: 24.5,
-    total_customers: 1322,
-    revenue_this_month: 18240,
-    mrr_over_time: generateMRRData(range),
-    revenue_by_plan: [
-      { name: 'Starter', value: 8240, color: '#3b82f6' },
-      { name: 'Pro', value: 18750, color: '#8b5cf6' },
-      { name: 'Business', value: 9620, color: '#06b6d4' },
-      { name: 'Enterprise', value: 8620, color: '#f59e0b' },
-    ],
-    signups_per_day: generateSignupsData(range),
-  };
-}
-
 // ─── Helpers ───
 
 function formatCurrency(amount: number): string {
@@ -224,10 +168,12 @@ export const AnalyticsPage: React.FC = () => {
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
             <div className="flex items-center justify-between mb-3">
               <DollarSign size={20} className="text-emerald-400" />
-              <span className="flex items-center gap-0.5 text-xs font-medium text-emerald-400">
-                <TrendingUp size={14} />
-                +5.2%
-              </span>
+              {analytics.mrr > 0 && (
+                <span className="flex items-center gap-0.5 text-xs font-medium text-emerald-400">
+                  <TrendingUp size={14} />
+                  Live
+                </span>
+              )}
             </div>
             <p className="text-2xl font-bold text-white">{formatCurrency(analytics.mrr)}</p>
             <p className="text-xs text-slate-500 mt-1">Monthly Recurring Revenue</p>
@@ -237,10 +183,12 @@ export const AnalyticsPage: React.FC = () => {
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
             <div className="flex items-center justify-between mb-3">
               <Users size={20} className="text-blue-400" />
-              <span className="flex items-center gap-0.5 text-xs font-medium text-emerald-400">
-                <TrendingUp size={14} />
-                +3.1%
-              </span>
+              {analytics.arpu > 0 && (
+                <span className="flex items-center gap-0.5 text-xs font-medium text-emerald-400">
+                  <TrendingUp size={14} />
+                  Live
+                </span>
+              )}
             </div>
             <p className="text-2xl font-bold text-white">{formatCurrency(analytics.arpu)}</p>
             <p className="text-xs text-slate-500 mt-1">Avg Revenue Per User</p>
@@ -250,10 +198,12 @@ export const AnalyticsPage: React.FC = () => {
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
             <div className="flex items-center justify-between mb-3">
               <Percent size={20} className="text-red-400" />
-              <span className={`flex items-center gap-0.5 text-xs font-medium ${analytics.churn_rate < 5 ? 'text-emerald-400' : 'text-red-400'}`}>
-                {analytics.churn_rate < 5 ? <TrendingUp size={14} /> : <TrendingUp size={14} className="rotate-180" />}
-                {analytics.churn_rate < 5 ? '-0.2%' : '+0.5%'}
-              </span>
+              {analytics.churn_rate > 0 && (
+                <span className={`flex items-center gap-0.5 text-xs font-medium ${analytics.churn_rate < 5 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {analytics.churn_rate < 5 ? <TrendingUp size={14} /> : <TrendingUp size={14} className="rotate-180" />}
+                  {analytics.churn_rate < 5 ? 'Good' : 'High'}
+                </span>
+              )}
             </div>
             <p className="text-2xl font-bold text-white">{formatPercent(analytics.churn_rate)}</p>
             <p className="text-xs text-slate-500 mt-1">Monthly Churn Rate</p>
@@ -263,10 +213,12 @@ export const AnalyticsPage: React.FC = () => {
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
             <div className="flex items-center justify-between mb-3">
               <Activity size={20} className="text-purple-400" />
-              <span className="flex items-center gap-0.5 text-xs font-medium text-emerald-400">
-                <TrendingUp size={14} />
-                +2.4%
-              </span>
+              {analytics.trial_conversion > 0 && (
+                <span className="flex items-center gap-0.5 text-xs font-medium text-emerald-400">
+                  <TrendingUp size={14} />
+                  Live
+                </span>
+              )}
             </div>
             <p className="text-2xl font-bold text-white">{formatPercent(analytics.trial_conversion)}</p>
             <p className="text-xs text-slate-500 mt-1">Trial Conversion Rate</p>
@@ -420,7 +372,9 @@ export const AnalyticsPage: React.FC = () => {
             </div>
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
               <p className="text-xs text-slate-500">MRR Growth</p>
-              <p className="text-lg font-bold text-emerald-400 mt-1">+5.2%</p>
+              <p className={`text-lg font-bold mt-1 ${analytics.mrr > 0 ? 'text-emerald-400' : 'text-slate-500'}`}>
+                {analytics.mrr > 0 ? 'Active' : '$0'}
+              </p>
             </div>
           </div>
         </>

@@ -39,7 +39,7 @@ class User(Base):
         Enum("admin", "user", name="user_role"), default="user", nullable=False
     )
     status: Mapped[str] = mapped_column(
-        Enum("active", "suspended", name="user_status"),
+        Enum("active", "suspended", "deleted", name="user_status"),
         default="active",
         nullable=False,
     )

@@ -13,8 +13,8 @@ interface Subscription {
   user_name: string;
   plan: 'hobby' | 'pro' | 'enterprise';
   status: 'active' | 'canceled' | 'expired' | 'past_due';
-  started_at: string;
-  expires_at: string;
+  started_at: string | null;
+  expires_at: string | null;
 }
 
 const PLANS = ['hobby', 'pro', 'enterprise'] as const;
@@ -147,8 +147,8 @@ export const SubscriptionsPage: React.FC = () => {
     setConfirmCancel(null);
   }, [apiFetch]);
 
-  const formatDate = (iso: string) =>
-    new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const formatDate = (iso: string | null) =>
+    iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
 
   if (error) {
     return (

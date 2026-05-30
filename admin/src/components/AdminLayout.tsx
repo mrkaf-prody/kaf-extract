@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   LayoutDashboard, Users, CreditCard, Settings, Ticket,
   LogOut, User, ChevronLeft, ChevronRight, Shield,
-  BarChart3, Activity, FileText,
+  BarChart3, Activity, FileText, ToggleLeft,
 } from 'lucide-react';
 
 const KafLogo: React.FC<{ size?: number }> = ({ size = 20 }) => (
@@ -24,6 +24,7 @@ const navItems = [
   { to: '/admin/subscriptions', icon: CreditCard, label: 'Subscriptions' },
   { to: '/admin/vouchers', icon: Ticket, label: 'Vouchers' },
   { to: '/admin/payments', icon: Settings, label: 'Payments' },
+  { to: '/admin/features', icon: ToggleLeft, label: 'Features' },
   { to: '/admin/profile', icon: User, label: 'Profile' },
 ];
 

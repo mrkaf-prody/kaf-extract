@@ -12,6 +12,7 @@ import { PaymentsPage } from './pages/PaymentsPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { MonitorPage } from './pages/MonitorPage';
 import { AuditLogsPage } from './pages/AuditLogsPage';
+import { FeaturesPage } from './pages/FeaturesPage';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -48,6 +49,7 @@ const App = () => (
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="monitor" element={<MonitorPage />} />
           <Route path="audit-logs" element={<AuditLogsPage />} />
+          <Route path="features" element={<FeaturesPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/admin" />} />
       </Routes>
