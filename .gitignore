@@ -7,6 +7,7 @@ data/
 venv/
 dist/
 !user-dashboard/dist/
+!landing/dist/
 *.egg-info/
 .vscode/
 .idea/

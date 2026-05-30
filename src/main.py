@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from src.routers import auth, extract, health, keys, metrics, subscriptions, vouchers, webhooks, admin_payments, schedules, integrations, organizations, usage
 from src.routers.admin import router as admin_router
+from src.routers.public import router as public_router
 
 
 def _run_migrations_sync(connection, alembic_cfg):
@@ -375,6 +376,7 @@ app.include_router(admin_payments.router)
 app.include_router(webhooks.router)
 app.include_router(usage.router, prefix="/api/v1")
 app.include_router(admin_router)
+app.include_router(public_router)
 
 # ── Admin Dashboard (SPA) ──────────────────────────────────────────
 
@@ -434,3 +436,43 @@ async def dashboard_spa_fallback(full_path: str):
 @app.get("/dashboard", include_in_schema=False)
 async def dashboard_index():
     return FileResponse(os.path.join(DASHBOARD_DIR, "index.html"))
+
+# ── Landing Page (SPA) — Catch-all, LOWEST priority ────────────────
+
+LANDING_DIR = os.path.join(os.path.dirname(__file__), "..", "landing", "dist")
+
+if os.path.isdir(LANDING_DIR):
+    # Mount landing assets first
+    if os.path.isdir(os.path.join(LANDING_DIR, "assets")):
+        app.mount("/landing/assets", StaticFiles(directory=os.path.join(LANDING_DIR, "assets")), name="landing_assets")
+
+    # Serve specific landing pages before catch-all
+    @app.get("/api-reference", include_in_schema=False)
+    async def api_reference():
+        idx = os.path.join(LANDING_DIR, "index.html")
+        return FileResponse(idx) if os.path.isfile(idx) else JSONResponse({"error": "not found"}, 404)
+
+    @app.get("/api-reference/{full_path:path}", include_in_schema=False)
+    async def api_reference_catch(full_path: str):
+        idx = os.path.join(LANDING_DIR, "index.html")
+        return FileResponse(idx) if os.path.isfile(idx) else JSONResponse({"error": "not found"}, 404)
+
+    @app.get("/tutorial", include_in_schema=False)
+    async def tutorial():
+        idx = os.path.join(LANDING_DIR, "index.html")
+        return FileResponse(idx) if os.path.isfile(idx) else JSONResponse({"error": "not found"}, 404)
+
+    @app.get("/tutorial/{full_path:path}", include_in_schema=False)
+    async def tutorial_catch(full_path: str):
+        idx = os.path.join(LANDING_DIR, "index.html")
+        return FileResponse(idx) if os.path.isfile(idx) else JSONResponse({"error": "not found"}, 404)
+
+    # Catch-all: landing page SPA — MUST BE LAST
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def landing_spa_fallback(full_path: str):
+        """Serve landing page SPA — fallback to index.html for client-side routing."""
+        file_path = os.path.join(LANDING_DIR, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        idx = os.path.join(LANDING_DIR, "index.html")
+        return FileResponse(idx) if os.path.isfile(idx) else JSONResponse({"error": "not found"}, 404)

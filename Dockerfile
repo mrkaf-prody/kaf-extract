@@ -30,6 +30,12 @@ RUN cd admin && npm install
 COPY admin/ ./admin/
 RUN cd admin && npm run build
 
+# Build landing page React SPA
+COPY landing/package.json landing/package-lock.json* ./landing/
+RUN cd landing && npm install
+COPY landing/ ./landing/
+RUN cd landing && npm run build
+
 # Copy application source code
 COPY src/ ./src/
 COPY alembic.ini .
