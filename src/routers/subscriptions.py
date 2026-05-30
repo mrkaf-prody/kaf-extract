@@ -12,7 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.config import settings
 from src.db import get_db
 from src.middleware.auth import get_current_user
-from src.models.sql_models import Invoice, Subscription, Trial, User
+from src.models.sql_models import Subscription, Trial, User
+from src.services.plans import get_plans, validate_plan_key
 from src.services.payments import get_provider
 from src.services.payments.dispatcher import PaymentDispatcher
 
@@ -139,14 +140,7 @@ async def get_my_subscription(
     trial = result.scalar_one_or_none()
 
     # Available plans
-    plans_list = []
-    for plan_key, plan_info in settings.plans.items():
-        plans_list.append({
-            "key": plan_key,
-            "name": plan_info["name"],
-            "price_cents": plan_info["price_cents"],
-            "features": plan_info["features"],
-        })
+    plans_list = await get_plans(db)
 
     return SubscriptionStatusResponse(
         subscription=_sub_to_response(sub) if sub else None,
@@ -165,18 +159,24 @@ async def create_checkout(
     user_id = current_user["user_id"]
 
     # Validate plan
-    if body.plan not in settings.plans:
+    if not await validate_plan_key(db, body.plan):
+        plans = await get_plans(db)
+        valid_keys = [p["key"] for p in plans]
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid plan '{body.plan}'. Choose: {list(settings.plans)}",
+            detail=f"Invalid plan '{body.plan}'. Choose: {valid_keys}",
         )
 
     # Get user email for checkout
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
 
-    # --- Hobby (Free) Plan: auto-activate, no payment needed ---
-    if body.plan == "hobby":
+    # Get plan details from DB
+    from src.services.plans import get_plan_by_key
+    plan = await get_plan_by_key(db, body.plan)
+
+    # --- Free Plan: auto-activate, no payment needed ---
+    if plan and plan["price_cents"] == 0:
         from datetime import UTC, datetime as dt
         from src.models.sql_models import Subscription
 
@@ -190,11 +190,11 @@ async def create_checkout(
             sub.status = "canceled"
             sub.canceled_at = dt.now(UTC)
 
-        # Create hobby subscription
+        # Create free subscription
         new_sub = Subscription(
             id=uuid.uuid4(),
             user_id=user_id,
-            plan="hobby",
+            plan=body.plan,
             status="active",
             provider="manual",
         )
@@ -204,8 +204,8 @@ async def create_checkout(
         return CheckoutResponse(
             checkout_url="",
             provider="manual",
-            plan="hobby",
-            message="Hobby plan activated — free forever. Start extracting!",
+            plan=body.plan,
+            message=f"{plan['name']} plan activated — free forever. Start extracting!",
         )
 
     # --- Paid plans: use payment provider ---

@@ -90,6 +90,67 @@ async def _seed_feature_flags():
     print(f"Feature flags: {total} total in database ({len(PLATFORM_FEATURE_FLAGS)} platform-defined)", file=sys.stderr)
 
 
+# ── Default plans to seed ─────────────────────────────────────────────
+
+DEFAULT_PLANS = [
+    {
+        "key": "hobby",
+        "name": "Hobby",
+        "description": "For individuals getting started with web extraction",
+        "price_cents": 0,
+        "currency": "USD",
+        "billing_period": "monthly",
+        "extractions_per_month": 1000,
+        "sort_order": 0,
+    },
+    {
+        "key": "pro",
+        "name": "Pro",
+        "description": "For professionals who need more power and features",
+        "price_cents": 2900,
+        "currency": "USD",
+        "billing_period": "monthly",
+        "extractions_per_month": 50000,
+        "sort_order": 1,
+    },
+    {
+        "key": "enterprise",
+        "name": "Enterprise",
+        "description": "For teams and businesses with high-volume needs",
+        "price_cents": 19900,
+        "currency": "USD",
+        "billing_period": "monthly",
+        "extractions_per_month": 500000,
+        "sort_order": 2,
+    },
+]
+
+
+async def _seed_default_plans():
+    """Seed default plans into the database (idempotent)."""
+    from sqlalchemy import select
+    from src.db import async_session_factory
+    from src.models.sql_models import Plan
+
+    async with async_session_factory() as session:
+        for plan_data in DEFAULT_PLANS:
+            result = await session.execute(
+                select(Plan).where(Plan.key == plan_data["key"])
+            )
+            existing = result.scalar_one_or_none()
+            if not existing:
+                plan = Plan(**plan_data)
+                session.add(plan)
+        await session.commit()
+
+    # Count total plans
+    async with async_session_factory() as session:
+        result = await session.execute(select(Plan))
+        total = len(result.scalars().all())
+    import sys
+    print(f"Plans: {total} total in database ({len(DEFAULT_PLANS)} default plans)", file=sys.stderr)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup/shutdown lifecycle — init Redis, verify Crawl4AI, init DB."""
@@ -125,6 +186,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         import sys
         print(f"WARNING: Feature flags seeding failed (non-fatal): {e}", file=sys.stderr)
+
+    # Seed default plans (Hobby, Pro, Enterprise — idempotent)
+    try:
+        await _seed_default_plans()
+    except Exception as e:
+        import sys
+        print(f"WARNING: Plans seeding failed (non-fatal): {e}", file=sys.stderr)
 
     # Connect Redis (caching + rate limiter + job queue)
     try:

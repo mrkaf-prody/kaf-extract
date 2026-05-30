@@ -92,9 +92,14 @@ class VoucherService:
         if quantity < 1 or quantity > 500:
             raise ValueError("Quantity must be between 1 and 500")
 
-        if plan not in settings.plans:
+        # Validate plan exists in DB
+        from src.services.plans import validate_plan_key
+        if not await validate_plan_key(self._db, plan):
+            from src.services.plans import get_plans
+            plans = await get_plans(self._db)
+            valid_keys = [p["key"] for p in plans]
             raise ValueError(
-                f"Invalid plan '{plan}'. Valid plans: {list(settings.plans)}"
+                f"Invalid plan '{plan}'. Valid plans: {valid_keys}"
             )
 
         if expiry_date is None:

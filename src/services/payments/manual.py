@@ -268,7 +268,9 @@ class ManualPaymentProvider(PaymentProvider):
         )
 
         # Create new subscription
-        plan_info = settings.plans.get(plan, settings.plans["hobby"])
+        from src.services.plans import get_plan_by_key
+        plan_data = await get_plan_by_key(db, plan)
+        plan_info = plan_data or settings.plans.get(plan, settings.plans["hobby"])
         now = datetime.now(UTC)
         # Simple monthly billing cycle
         from datetime import timedelta
