@@ -14,6 +14,7 @@ interface AuthCtx {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
+  loginWith2FA: (email: string, password: string, totpCode: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
   apiFetch: (path: string, opts?: RequestInit) => Promise<any>;
@@ -62,6 +63,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fetchMe(t).finally(() => setLoading(false));
   }, []);
 
+  const _storeTokens = (data: any) => {
+    localStorage.setItem('access_token', data.access_token);
+    localStorage.setItem('refresh_token', data.refresh_token);
+    if (data.user) {
+      setUser(data.user);
+      localStorage.setItem('user_cache', JSON.stringify(data.user));
+    }
+    setToken(data.access_token);
+  };
+
   const login = async (email: string, password: string) => {
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
@@ -74,15 +85,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     const data = await res.json();
     if (data.requires_2fa) {
-      throw new Error(data.message || '2FA required');
+      // Throw a special error that the LoginPage can detect
+      const err = new Error('2FA_REQUIRED') as any;
+      err.requires_2fa = true;
+      err.email = email;
+      throw err;
     }
-    localStorage.setItem('access_token', data.access_token);
-    localStorage.setItem('refresh_token', data.refresh_token);
-    if (data.user) {
-      setUser(data.user);
-      localStorage.setItem('user_cache', JSON.stringify(data.user));
+    _storeTokens(data);
+  };
+
+  const loginWith2FA = async (email: string, password: string, totpCode: string) => {
+    const res = await fetch(`${API_BASE}/auth/2fa/authenticate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, totp_code: totpCode }),
+    });
+    if (!res.ok) {
+      const e = await res.json();
+      throw new Error(e.detail || 'Invalid 2FA code');
     }
-    setToken(data.access_token);
+    const data = await res.json();
+    _storeTokens(data);
   };
 
   const logout = () => {
@@ -117,7 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading, apiFetch }}>
+    <AuthContext.Provider value={{ user, token, login, loginWith2FA, logout, loading, apiFetch }}>
       {children}
     </AuthContext.Provider>
   );
