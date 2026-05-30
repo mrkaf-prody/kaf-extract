@@ -41,6 +41,11 @@ class AdminUserItem(BaseModel):
     created_at: str
 
 
+class PaginatedUsersResponse(BaseModel):
+    users: list[AdminUserItem]
+    total: int
+
+
 class AdminStatsResponse(BaseModel):
     total_users: int
     active_subscriptions: int
@@ -108,7 +113,7 @@ async def list_subscriptions(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/users", response_model=list[AdminUserItem])
+@router.get("/users", response_model=PaginatedUsersResponse)
 async def list_users(
     search: str = Query("", description="Filter by email or name"),
     role: str = Query("all"),
@@ -133,17 +138,32 @@ async def list_users(
     query = query.limit(limit).offset(offset)
     result = await db.execute(query)
 
-    return [
-        AdminUserItem(
-            id=str(u.id),
-            email=u.email,
-            name=u.name,
-            role=u.role,
-            status=u.status,
-            created_at=u.created_at.isoformat() if u.created_at else "",
+    # Count total matching users
+    count_query = select(func.count(User.id))
+    if search:
+        count_query = count_query.where(
+            (User.email.ilike(f"%{search}%")) | (User.name.ilike(f"%{search}%"))
         )
-        for u in result.scalars().all()
-    ]
+    if role != "all":
+        count_query = count_query.where(User.role == role)
+    if status != "all":
+        count_query = count_query.where(User.status == status)
+    total = await db.scalar(count_query) or 0
+
+    return {
+        "users": [
+            AdminUserItem(
+                id=str(u.id),
+                email=u.email,
+                name=u.name,
+                role=u.role,
+                status=u.status,
+                created_at=u.created_at.isoformat() if u.created_at else "",
+            )
+            for u in result.scalars().all()
+        ],
+        "total": total,
+    }
 
 
 class UpdateUserRequest(BaseModel):
