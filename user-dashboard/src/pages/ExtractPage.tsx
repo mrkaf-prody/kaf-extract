@@ -3,7 +3,8 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   Link2, Bot, FileJson, Download, Copy, Check, History,
   X, Sparkles, AlertTriangle, ChevronRight, ChevronLeft,
-  Globe, Clock, Info, Trash2, Play
+  Globe, Clock, Info, Trash2, Play, Lock, Layers, HelpCircle,
+  ChevronDown, List
 } from 'lucide-react';
 
 type Mode = 'ai' | 'schema';
@@ -16,6 +17,12 @@ interface HistoryItem {
   status: 'loading' | 'success' | 'error';
   result?: any;
   error?: string;
+}
+
+interface Subscription {
+  subscription: { plan: string; status: string } | null;
+  trial: { extractions_total: number; extractions_used: number; extractions_remaining: number; days_left: number } | null;
+  available_plans: Array<{ key: string; name: string; extractions_per_month: number; features: string[] }>;
 }
 
 const HISTORY_KEY = 'kaf_extract_history';
@@ -97,6 +104,43 @@ const TUTORIAL_STEPS = [
   },
 ];
 
+const SCHEMA_TEMPLATES = [
+  {
+    name: '🛒 E-commerce Products',
+    schema: { selectors: { name: '.product-title', price: '.product-price', image: '.product-image@src', rating: '.product-rating', description: '.product-description' } }
+  },
+  {
+    name: '📰 News Articles',
+    schema: { selectors: { title: 'article h1', author: '.author-name', date: '.publish-date', content: 'article .body', url: 'article a@href' } }
+  },
+  {
+    name: '🏠 Real Estate Listings',
+    schema: { selectors: { address: '.listing-address', price: '.listing-price', beds: '.beds-count', baths: '.baths-count', sqft: '.sqft-value', image: '.listing-photo@src' } }
+  },
+  {
+    name: '💼 Job Postings',
+    schema: { selectors: { title: '.job-title', company: '.company-name', location: '.job-location', salary: '.salary-range', description: '.job-description' } }
+  },
+  {
+    name: '📊 Financial Data',
+    schema: { selectors: { symbol: '.stock-symbol', price: '.stock-price', change: '.price-change', volume: '.trade-volume' } }
+  },
+  {
+    name: '🔍 SEO Meta Tags',
+    schema: { selectors: { title: 'meta[property="og:title"]@content', description: 'meta[property="og:description"]@content', keywords: 'meta[name="keywords"]@content', image: 'meta[property="og:image"]@content' } }
+  },
+];
+
+const EXTRACT_OPTIONS = [
+  { key: 'markdown', icon: '📝', label: 'Markdown', desc: 'Convert page to clean markdown' },
+  { key: 'screenshot', icon: '📸', label: 'Screenshot', desc: 'Capture full-page screenshot' },
+  { key: 'links', icon: '🔗', label: 'Links', desc: 'Extract all hyperlinks from the page' },
+  { key: 'javascript', icon: '⚡', label: 'JavaScript', desc: 'Enable JS rendering for SPAs' },
+  { key: 'waitForSelector', icon: '🎯', label: 'Wait for Element', desc: 'Wait until a specific element appears — great for dynamic content' },
+];
+
+const formatNumber = (n: number) => n.toLocaleString();
+
 export const ExtractPage: React.FC = () => {
   const { apiFetch, showError, showSuccess } = useAuth();
 
@@ -108,8 +152,8 @@ export const ExtractPage: React.FC = () => {
   const [includeMarkdown, setIncludeMarkdown] = useState(true);
   const [includeScreenshots, setIncludeScreenshots] = useState(false);
   const [includeLinks, setIncludeLinks] = useState(true);
+  const [includeJavascript, setIncludeJavascript] = useState(false);
   const [waitForSelector, setWaitForSelector] = useState('');
-  const [timeoutMs, setTimeoutMs] = useState(30000);
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any | null>(null);
@@ -123,6 +167,33 @@ export const ExtractPage: React.FC = () => {
   const [tutorialStep, setTutorialStep] = useState(0);
   const tourRefs = useRef<Record<string, DOMRect | null>>({});
 
+  // Plan-aware state
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [batchMode, setBatchMode] = useState(false);
+  const [batchUrls, setBatchUrls] = useState('');
+  const [templateDropdownOpen, setTemplateDropdownOpen] = useState(false);
+
+  // Fetch subscription on mount
+  useEffect(() => {
+    const fetchSub = async () => {
+      try {
+        const data = await apiFetch('/api/v1/subscriptions/me');
+        setSubscription(data);
+      } catch {
+        // Silently fail — UI degrades gracefully
+      }
+    };
+    fetchSub();
+  }, [apiFetch]);
+
+  const currentPlan = subscription?.subscription?.plan?.toLowerCase() || 'hobby';
+  const isHobby = currentPlan === 'hobby' || currentPlan === 'free' || !subscription?.subscription;
+  const isPro = currentPlan === 'pro';
+  const isEnterprise = currentPlan === 'enterprise' || currentPlan === 'business';
+  const canUseAI = !isHobby;
+  const canUseBatch = !isHobby;
+  const batchLimit = isEnterprise ? 50 : 10;
+
   // Persist history
   useEffect(() => {
     saveHistory(history);
@@ -134,13 +205,62 @@ export const ExtractPage: React.FC = () => {
     setJsonSchema(jsonBeautify(jsonSchema));
   };
 
+  const toggleOption = (key: string) => {
+    switch (key) {
+      case 'markdown': setIncludeMarkdown(v => !v); break;
+      case 'screenshot': setIncludeScreenshots(v => !v); break;
+      case 'links': setIncludeLinks(v => !v); break;
+      case 'javascript': setIncludeJavascript(v => !v); break;
+      case 'waitForSelector':
+        if (waitForSelector) {
+          setWaitForSelector('');
+        } else {
+          setWaitForSelector(' ');
+        }
+        break;
+    }
+  };
+
+  const isOptionActive = (key: string): boolean => {
+    switch (key) {
+      case 'markdown': return includeMarkdown;
+      case 'screenshot': return includeScreenshots;
+      case 'links': return includeLinks;
+      case 'javascript': return includeJavascript;
+      case 'waitForSelector': return waitForSelector.trim().length > 0;
+      default: return false;
+    }
+  };
+
+  const handleTemplateSelect = (template: typeof SCHEMA_TEMPLATES[number]) => {
+    setJsonSchema(JSON.stringify(template.schema, null, 2));
+    setTemplateDropdownOpen(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!url.trim()) {
-      showError('Please enter a URL');
-      return;
+
+    // Determine URLs
+    let urls: string[] = [];
+    if (batchMode && canUseBatch) {
+      const lines = batchUrls.split('\n').map(l => l.trim()).filter(Boolean);
+      if (lines.length === 0) {
+        showError('Please enter at least one URL');
+        return;
+      }
+      if (lines.length > batchLimit) {
+        showError(`Maximum ${batchLimit} URLs allowed for your plan`);
+        return;
+      }
+      urls = lines;
+    } else {
+      if (!url.trim()) {
+        showError('Please enter a URL');
+        return;
+      }
+      urls = [url.trim()];
     }
-    const trimmedUrl = url.trim();
+
     setLoading(true);
     setResult(null);
     setResultError(null);
@@ -149,7 +269,7 @@ export const ExtractPage: React.FC = () => {
     const jobId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const historyEntry: HistoryItem = {
       id: jobId,
-      url: trimmedUrl,
+      url: urls[0] + (urls.length > 1 ? ` (+${urls.length - 1} more)` : ''),
       mode,
       timestamp: Date.now(),
       status: 'loading',
@@ -160,20 +280,23 @@ export const ExtractPage: React.FC = () => {
       let payload: any;
       let endpoint: string;
 
+      const optionsPayload = {
+        include_markdown: includeMarkdown,
+        include_screenshots: includeScreenshots,
+        include_links: includeLinks,
+        include_javascript: includeJavascript,
+        wait_for_selector: waitForSelector.trim() || undefined,
+        timeout_ms: 30000,
+      };
+
       if (mode === 'ai') {
         if (!schemaDescription.trim()) {
           throw new Error('Please describe what you want to extract');
         }
         endpoint = '/api/v1/extract/ai';
-        payload = {
-          url: trimmedUrl,
-          prompt: schemaDescription.trim(),
-          include_markdown: includeMarkdown,
-          include_screenshots: includeScreenshots,
-          include_links: includeLinks,
-          wait_for_selector: waitForSelector.trim() || undefined,
-          timeout_ms: timeoutMs,
-        };
+        payload = batchMode && urls.length > 1
+          ? { urls, prompt: schemaDescription.trim(), ...optionsPayload }
+          : { url: urls[0], prompt: schemaDescription.trim(), ...optionsPayload };
       } else {
         if (!jsonSchema.trim()) {
           throw new Error('Please provide a JSON schema');
@@ -181,15 +304,9 @@ export const ExtractPage: React.FC = () => {
         const v = jsonValidate(jsonSchema);
         if (!v.ok) throw new Error(v.error || 'Invalid JSON schema');
         endpoint = '/api/v1/extract';
-        payload = {
-          url: trimmedUrl,
-          schema: JSON.parse(jsonSchema),
-          include_markdown: includeMarkdown,
-          include_screenshots: includeScreenshots,
-          include_links: includeLinks,
-          wait_for_selector: waitForSelector.trim() || undefined,
-          timeout_ms: timeoutMs,
-        };
+        payload = batchMode && urls.length > 1
+          ? { urls, schema: JSON.parse(jsonSchema), ...optionsPayload }
+          : { url: urls[0], schema: JSON.parse(jsonSchema), ...optionsPayload };
       }
 
       const data = await apiFetch(endpoint, {
@@ -358,51 +475,170 @@ export const ExtractPage: React.FC = () => {
     );
   };
 
+  const hasValidInput = batchMode && canUseBatch
+    ? batchUrls.split('\n').map(l => l.trim()).filter(Boolean).length > 0
+    : url.trim().length > 0;
+
   const isSubmitDisabled =
     loading ||
-    !url.trim() ||
+    !hasValidInput ||
     (mode === 'ai' ? !schemaDescription.trim() : !jsonSchema.trim() || !activeSchema.ok);
+
+  const planBadgeColor = isHobby
+    ? 'bg-[#14141f] border-[#1c1c2a] text-[#9a9aae]'
+    : isPro
+    ? 'bg-[#4494ff]/10 border-[#4494ff]/30 text-[#4494ff]'
+    : 'bg-[#00d4a0]/10 border-[#00d4a0]/30 text-[#00d4a0]';
+
+  const planLabel = subscription?.subscription
+    ? `${subscription.subscription.plan.charAt(0).toUpperCase() + subscription.subscription.plan.slice(1)} Plan`
+    : 'Hobby Plan';
+
+  // Usage data
+  const usageUsed = subscription?.trial?.extractions_used ?? 0;
+  const usageTotal = subscription?.trial?.extractions_total ?? (
+    subscription?.available_plans?.find(p => p.key === currentPlan)?.extractions_per_month ?? 1000
+  );
+  const usagePercent = usageTotal > 0 ? Math.min((usageUsed / usageTotal) * 100, 100) : 0;
 
   return (
     <div className="max-w-6xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-white mb-1">No-Code Extract</h2>
-          <p className="text-slate-400 text-sm">
-            Extract structured data from any web page using AI or JSON schema.
-          </p>
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-bold text-white">Extract</h2>
+            <span className={`text-[11px] px-2.5 py-0.5 rounded-full border font-medium ${planBadgeColor}`}>
+              {planLabel}
+            </span>
+          </div>
+          <button
+            onClick={() => { setTutorialOpen(true); setTutorialStep(0); }}
+            className="flex items-center gap-2 bg-[#14141f] hover:bg-[#1c1c2a] border border-[#1c1c2a] text-[#f0f0f5] rounded-lg px-3 py-2 text-sm transition-colors"
+          >
+            <Sparkles size={16} />
+            Try Tutorial
+          </button>
         </div>
-        <button
-          onClick={() => { setTutorialOpen(true); setTutorialStep(0); }}
-          className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm transition-colors"
-        >
-          <Sparkles size={16} />
-          Try Tutorial
-        </button>
+        <p className="text-[#9a9aae] text-sm mb-3">
+          Extract structured data from any web page using AI or JSON schema.
+        </p>
+
+        {/* Usage Bar */}
+        {subscription && (
+          <div className="bg-[#0a0a12] border border-[#1c1c2a] rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-[#9a9aae]">
+                {formatNumber(usageUsed)} / {formatNumber(usageTotal)} extractions used
+              </span>
+              {subscription.trial && (
+                <span className="text-xs text-[#00d4a0] flex items-center gap-1">
+                  <Clock size={12} />
+                  Trial: {subscription.trial.days_left} days left, {formatNumber(subscription.trial.extractions_remaining)} remaining
+                </span>
+              )}
+            </div>
+            <div className="w-full h-1.5 bg-[#14141f] rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${usagePercent}%`,
+                  backgroundColor: usagePercent > 90 ? '#ef4444' : usagePercent > 70 ? '#f59e0b' : '#00d4a0',
+                }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Form */}
         <div className="lg:col-span-2 space-y-4">
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* URL */}
+            {/* URL / Batch Input */}
             <div
               className="bg-[#0a0a12] border border-[#1c1c2a] rounded-xl p-4"
               data-tour="url"
             >
-              <label className="block text-sm font-medium text-[#f0f0f5] mb-2">
-                <Globe size={14} className="inline mr-1 -mt-0.5 text-[#9a9aae]" />
-                Target URL
-              </label>
-              <input
-                type="url"
-                value={url}
-                onChange={e => setUrl(e.target.value)}
-                placeholder="https://example.com/products"
-                required
-                className="w-full bg-[#14141f] border border-[#1c1c2a] rounded-lg px-3 py-2.5 text-sm text-[#f0f0f5] placeholder-[#5c5c70] focus:outline-none focus:border-[#00d4a0] transition-colors"
-              />
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-[#f0f0f5]">
+                  <Globe size={14} className="inline mr-1 -mt-0.5 text-[#9a9aae]" />
+                  {batchMode ? 'Batch URLs' : 'Target URL'}
+                </label>
+                <div className="flex items-center bg-[#14141f] rounded-lg p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setBatchMode(false)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                      !batchMode
+                        ? 'bg-[#1c1c2a] text-[#f0f0f5]'
+                        : 'text-[#5c5c70] hover:text-[#9a9aae]'
+                    }`}
+                  >
+                    <Globe size={12} />
+                    Single URL
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!canUseBatch) return;
+                      setBatchMode(true);
+                    }}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors relative ${
+                      !canUseBatch
+                        ? 'text-[#5c5c70] cursor-not-allowed'
+                        : batchMode
+                        ? 'bg-[#1c1c2a] text-[#f0f0f5]'
+                        : 'text-[#5c5c70] hover:text-[#9a9aae]'
+                    }`}
+                    title={!canUseBatch ? 'Upgrade to Pro for batch mode' : undefined}
+                  >
+                    {!canUseBatch && <Lock size={10} className="text-[#5c5c70]" />}
+                    <Layers size={12} />
+                    Batch Mode
+                  </button>
+                </div>
+              </div>
+
+              {batchMode && canUseBatch ? (
+                <div>
+                  <textarea
+                    value={batchUrls}
+                    onChange={e => setBatchUrls(e.target.value)}
+                    rows={4}
+                    placeholder={`Enter one URL per line (max ${batchLimit}):\nhttps://example.com/page1\nhttps://example.com/page2\nhttps://example.com/page3`}
+                    className="w-full bg-[#14141f] border border-[#1c1c2a] rounded-lg px-3 py-2.5 text-sm text-[#f0f0f5] placeholder-[#5c5c70] focus:outline-none focus:border-[#00d4a0] transition-colors resize-y font-mono"
+                  />
+                  <p className="text-xs text-[#5c5c70] mt-1.5">
+                    {batchUrls.split('\n').filter(l => l.trim()).length} / {batchLimit} URLs entered
+                  </p>
+                </div>
+              ) : (
+                <input
+                  type="url"
+                  value={url}
+                  onChange={e => setUrl(e.target.value)}
+                  placeholder="https://example.com/products"
+                  required={!batchMode}
+                  className="w-full bg-[#14141f] border border-[#1c1c2a] rounded-lg px-3 py-2.5 text-sm text-[#f0f0f5] placeholder-[#5c5c70] focus:outline-none focus:border-[#00d4a0] transition-colors"
+                />
+              )}
+
+              {!canUseBatch && (
+                <div className="flex items-center gap-2 mt-2 text-xs text-[#5c5c70]">
+                  <Lock size={12} />
+                  <span>
+                    Batch mode available with{' '}
+                    <button
+                      type="button"
+                      className="text-[#4494ff] hover:underline"
+                      onClick={() => window.location.href = '/dashboard/subscription'}
+                    >
+                      Pro plan
+                    </button>
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Mode Toggle */}
@@ -416,13 +652,19 @@ export const ExtractPage: React.FC = () => {
               <div className="flex bg-[#14141f] rounded-lg p-1 gap-1">
                 <button
                   type="button"
-                  onClick={() => setMode('ai')}
+                  onClick={() => {
+                    if (!canUseAI) return;
+                    setMode('ai');
+                  }}
                   className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                    mode === 'ai'
+                    !canUseAI
+                      ? 'text-[#5c5c70] cursor-not-allowed relative'
+                      : mode === 'ai'
                       ? 'bg-[#00d4a0] text-black'
                       : 'text-[#9a9aae] hover:text-[#f0f0f5] hover:bg-[#1c1c2a]'
                   }`}
                 >
+                  {!canUseAI && <Lock size={14} className="absolute left-3" />}
                   <Bot size={16} />
                   AI (Natural Language)
                 </button>
@@ -439,6 +681,21 @@ export const ExtractPage: React.FC = () => {
                   Schema (JSON)
                 </button>
               </div>
+              {!canUseAI && (
+                <div className="flex items-center gap-2 mt-2 text-xs text-[#5c5c70]">
+                  <Lock size={12} />
+                  <span>
+                    AI mode requires a{' '}
+                    <button
+                      type="button"
+                      className="text-[#4494ff] hover:underline"
+                      onClick={() => window.location.href = '/dashboard/subscription'}
+                    >
+                      Pro or Enterprise plan
+                    </button>
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Mode-specific inputs */}
@@ -463,6 +720,37 @@ export const ExtractPage: React.FC = () => {
               </div>
             ) : (
               <div className="bg-[#0a0a12] border border-[#1c1c2a] rounded-xl p-4">
+                {/* Templates dropdown */}
+                <div className="mb-3">
+                  <label className="block text-xs text-[#5c5c70] mb-1.5">
+                    Quick Templates
+                  </label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setTemplateDropdownOpen(v => !v)}
+                      className="w-full flex items-center justify-between bg-[#14141f] border border-[#1c1c2a] rounded-lg px-3 py-2 text-sm text-[#9a9aae] hover:border-[#2a2a3e] transition-colors"
+                    >
+                      <span>Select a pre-made schema template...</span>
+                      <ChevronDown size={14} className={`transition-transform ${templateDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {templateDropdownOpen && (
+                      <div className="absolute z-20 w-full mt-1 bg-[#14141f] border border-[#1c1c2a] rounded-lg shadow-xl overflow-hidden">
+                        {SCHEMA_TEMPLATES.map((tpl, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => handleTemplateSelect(tpl)}
+                            className="w-full text-left px-3 py-2 text-sm text-[#f0f0f5] hover:bg-[#1c1c2a] transition-colors border-b border-[#1c1c2a] last:border-b-0"
+                          >
+                            {tpl.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <div className="flex items-center justify-between mb-2">
                   <label className="block text-sm font-medium text-[#f0f0f5]">
                     JSON Schema
@@ -504,7 +792,7 @@ export const ExtractPage: React.FC = () => {
               </div>
             )}
 
-            {/* Options */}
+            {/* Options — Icon Toggle Buttons */}
             <div
               className="bg-[#0a0a12] border border-[#1c1c2a] rounded-xl p-4"
               data-tour="options"
@@ -512,40 +800,60 @@ export const ExtractPage: React.FC = () => {
               <label className="block text-sm font-medium text-[#f0f0f5] mb-3">
                 Options
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                <label className="flex items-center gap-2 text-sm text-[#9a9aae] cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={includeMarkdown}
-                    onChange={e => setIncludeMarkdown(e.target.checked)}
-                    className="accent-[#00d4a0] w-4 h-4 rounded border-[#1c1c2a]"
-                  />
-                  Include markdown
-                </label>
-                <label className="flex items-center gap-2 text-sm text-[#9a9aae] cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={includeScreenshots}
-                    onChange={e => setIncludeScreenshots(e.target.checked)}
-                    className="accent-[#00d4a0] w-4 h-4 rounded border-[#1c1c2a]"
-                  />
-                  Include screenshots
-                </label>
-                <label className="flex items-center gap-2 text-sm text-[#9a9aae] cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={includeLinks}
-                    onChange={e => setIncludeLinks(e.target.checked)}
-                    className="accent-[#00d4a0] w-4 h-4 rounded border-[#1c1c2a]"
-                  />
-                  Include links
-                </label>
+              <div className="flex flex-wrap gap-2">
+                {EXTRACT_OPTIONS.map(opt => {
+                  const active = isOptionActive(opt.key);
+                  return (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => toggleOption(opt.key)}
+                      title={opt.desc}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
+                        active
+                          ? 'bg-[#00d4a0]/10 border-[#00d4a0]/30 text-[#00d4a0]'
+                          : 'bg-[#14141f] border-[#1c1c2a] text-[#9a9aae] hover:border-[#2a2a3e] hover:text-[#b8b8c8]'
+                      }`}
+                    >
+                      <span className="text-base">{opt.icon}</span>
+                      {opt.label}
+                    </button>
+                  );
+                })}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-[#5c5c70] mb-1">
-                    Wait for selector (optional)
-                  </label>
+
+              {/* Wait for Element sub-input */}
+              {isOptionActive('waitForSelector') && waitForSelector.trim().length > 0 && (
+                <div className="mt-3">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <label className="text-xs text-[#5c5c70]">CSS Selector</label>
+                    <span className="group relative">
+                      <HelpCircle size={12} className="text-[#5c5c70] cursor-help" />
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-56 bg-[#1c1c2a] border border-[#2a2a3e] text-xs text-[#9a9aae] rounded-lg p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-30">
+                        Enter a CSS selector for the element to wait for. The extractor will pause until this element appears in the DOM, useful for SPAs with lazy-loaded content.
+                      </span>
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    value={waitForSelector === ' ' ? '' : waitForSelector}
+                    onChange={e => setWaitForSelector(e.target.value)}
+                    placeholder=".content-loaded"
+                    className="w-full bg-[#14141f] border border-[#1c1c2a] rounded-lg px-3 py-2 text-sm text-[#f0f0f5] placeholder-[#5c5c70] focus:outline-none focus:border-[#00d4a0] transition-colors"
+                  />
+                </div>
+              )}
+              {isOptionActive('waitForSelector') && waitForSelector.trim().length === 0 && (
+                <div className="mt-3">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <label className="text-xs text-[#5c5c70]">CSS Selector</label>
+                    <span className="group relative">
+                      <HelpCircle size={12} className="text-[#5c5c70] cursor-help" />
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-56 bg-[#1c1c2a] border border-[#2a2a3e] text-xs text-[#9a9aae] rounded-lg p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-30">
+                        Enter a CSS selector for the element to wait for. The extractor will pause until this element appears in the DOM, useful for SPAs with lazy-loaded content.
+                      </span>
+                    </span>
+                  </div>
                   <input
                     type="text"
                     value={waitForSelector}
@@ -554,21 +862,7 @@ export const ExtractPage: React.FC = () => {
                     className="w-full bg-[#14141f] border border-[#1c1c2a] rounded-lg px-3 py-2 text-sm text-[#f0f0f5] placeholder-[#5c5c70] focus:outline-none focus:border-[#00d4a0] transition-colors"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs text-[#5c5c70] mb-1">
-                    Timeout (ms)
-                  </label>
-                  <input
-                    type="number"
-                    min={1000}
-                    max={120000}
-                    step={1000}
-                    value={timeoutMs}
-                    onChange={e => setTimeoutMs(Number(e.target.value))}
-                    className="w-full bg-[#14141f] border border-[#1c1c2a] rounded-lg px-3 py-2 text-sm text-[#f0f0f5] placeholder-[#5c5c70] focus:outline-none focus:border-[#00d4a0] transition-colors"
-                  />
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Submit */}
