@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -221,9 +221,122 @@ async def delete_user(
     return MessageResponse(message=f"User '{user.email}' has been deleted")
 
 
-# ---------------------------------------------------------------------------
-# Stats
-# ---------------------------------------------------------------------------
+class CreateUserRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=128)
+    name: str | None = None
+    role: str = Field(default="user")
+
+
+@router.post("/users", response_model=AdminUserItem, status_code=status.HTTP_201_CREATED)
+async def admin_create_user(
+    body: CreateUserRequest,
+    admin: dict = Depends(admin_required),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a new user from the admin panel (admin only)."""
+    from src.utils.bcrypt_utils import hash_password
+    # Check email exists
+    existing = await db.execute(select(User).where(User.email == body.email))
+    if existing.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User with this email already exists",
+        )
+    user = User(
+        id=uuid.uuid4(),
+        email=body.email,
+        password_hash=hash_password(body.password),
+        name=body.name,
+        role=body.role,
+        status="active",
+    )
+    db.add(user)
+    await db.flush()
+    return AdminUserItem(
+        id=str(user.id),
+        email=user.email,
+        name=user.name,
+        role=user.role,
+        status=user.status,
+        created_at=user.created_at.isoformat() if user.created_at else "",
+    )
+
+
+@router.get("/users/{user_id}", response_model=AdminUserItem)
+async def get_user(
+    user_id: str,
+    admin: dict = Depends(admin_required),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get a single user by ID (admin only)."""
+    try:
+        uid = uuid.UUID(user_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid user_id UUID format",
+        )
+    result = await db.execute(select(User).where(User.id == uid))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    return AdminUserItem(
+        id=str(user.id),
+        email=user.email,
+        name=user.name,
+        role=user.role,
+        status=user.status,
+        created_at=user.created_at.isoformat() if user.created_at else "",
+    )
+
+
+class AdminUpdateUserRequest(BaseModel):
+    name: str | None = None
+    role: str | None = None
+    status: str | None = None
+
+
+@router.patch("/users/{user_id}", response_model=AdminUserItem)
+async def admin_update_user(
+    user_id: str,
+    body: AdminUpdateUserRequest,
+    admin: dict = Depends(admin_required),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update a user's name, role, or status from the admin panel."""
+    try:
+        uid = uuid.UUID(user_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid user_id UUID format",
+        )
+    result = await db.execute(select(User).where(User.id == uid))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    if body.name is not None:
+        user.name = body.name
+    if body.role is not None:
+        user.role = body.role
+    if body.status is not None:
+        user.status = body.status
+    await db.flush()
+    return AdminUserItem(
+        id=str(user.id),
+        email=user.email,
+        name=user.name,
+        role=user.role,
+        status=user.status,
+        created_at=user.created_at.isoformat() if user.created_at else "",
+    )
 
 
 @router.get("/stats", response_model=AdminStatsResponse)

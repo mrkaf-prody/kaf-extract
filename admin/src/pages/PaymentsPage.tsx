@@ -143,6 +143,10 @@ export const PaymentsPage: React.FC = () => {
   const [showKey, setShowKey] = useState<Record<string, boolean>>({
     lemonsqueezy: false, paddle: false, stripe: false, manual: false,
   });
+  // Per-provider enabled state
+  const [enabledState, setEnabledState] = useState<Record<string, boolean>>({
+    lemonsqueezy: false, paddle: false, stripe: false, manual: true,
+  });
 
   // Transactions state
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -161,12 +165,15 @@ export const PaymentsPage: React.FC = () => {
       setTestMode(data.test_mode);
       const keys: Record<string, string> = {};
       const secrets: Record<string, string> = {};
+      const enabled: Record<string, boolean> = {};
       for (const [p, info] of Object.entries(data.providers)) {
         keys[p] = info.api_key || '';
         secrets[p] = info.webhook_secret || '';
+        enabled[p] = info.enabled ?? (p === 'manual');
       }
       setApiKeys(keys);
       setWebhookSecrets(secrets);
+      setEnabledState(enabled);
       setConfigError(null);
     } catch (err: any) {
       setConfigError(err.message || 'Failed to load payment config');
@@ -209,7 +216,7 @@ export const PaymentsPage: React.FC = () => {
         providers[p] = {
           api_key: apiKeys[p] || '',
           webhook_secret: webhookSecrets[p] || '',
-          enabled: config?.providers?.[p]?.enabled ?? true,
+          enabled: enabledState[p] ?? (p === 'manual'),
         };
       }
       payload.providers = providers;
@@ -313,12 +320,32 @@ export const PaymentsPage: React.FC = () => {
             <div className="space-y-4 mb-6">
               {(Object.keys(apiKeys) as Provider[]).map((provider) => (
                 <div key={provider} className="p-4 bg-slate-800/50 rounded-lg border border-slate-700/50">
-                  <div className="flex items-center gap-2 mb-3">
-                    <CreditCard size={14} className={providerIconColor(provider)} />
-                    <span className="text-sm font-medium text-slate-300">{providerLabel(provider)}</span>
-                    {!providers[provider]?.enabled && (
-                      <span className="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-500">Disabled</span>
-                    )}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <CreditCard size={14} className={providerIconColor(provider)} />
+                      <span className="text-sm font-medium text-slate-300">{providerLabel(provider)}</span>
+                      {!enabledState[provider] && (
+                        <span className="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-500">Disabled</span>
+                      )}
+                    </div>
+                    {/* Enable / Disable Toggle */}
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs ${enabledState[provider] ? 'text-emerald-400' : 'text-slate-500'}`}>
+                        {enabledState[provider] ? 'Enabled' : 'Disabled'}
+                      </span>
+                      <button
+                        onClick={() => setEnabledState((prev) => ({ ...prev, [provider]: !prev[provider] }))}
+                        className={`relative w-9 h-5 rounded-full transition-colors ${
+                          enabledState[provider] ? 'bg-emerald-600' : 'bg-slate-700'
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                            enabledState[provider] ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
                   </div>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                     {/* API Key */}
@@ -330,18 +357,18 @@ export const PaymentsPage: React.FC = () => {
                           value={apiKeys[provider] || ''}
                           onChange={(e) => setApiKeys((prev) => ({ ...prev, [provider]: e.target.value }))}
                           placeholder={
-                            providers[provider]?.enabled
+                            enabledState[provider]
                               ? `Enter ${providerLabel(provider)} API key...`
                               : 'Provider disabled'
                           }
-                          disabled={!providers[provider]?.enabled}
+                          disabled={!enabledState[provider]}
                           className="w-full pl-3 pr-10 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-600 font-mono focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         />
                         <button
                           type="button"
                           onClick={() => setShowKey((prev) => ({ ...prev, [provider]: !prev[provider] }))}
                           className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
-                          disabled={!providers[provider]?.enabled}
+                          disabled={!enabledState[provider]}
                         >
                           {showKey[provider] ? <EyeOff size={14} /> : <Eye size={14} />}
                         </button>
@@ -355,11 +382,11 @@ export const PaymentsPage: React.FC = () => {
                         value={webhookSecrets[provider] || ''}
                         onChange={(e) => setWebhookSecrets((prev) => ({ ...prev, [provider]: e.target.value }))}
                         placeholder={
-                          providers[provider]?.enabled
+                          enabledState[provider]
                             ? `Enter webhook secret...`
                             : 'Provider disabled'
                         }
-                        disabled={!providers[provider]?.enabled}
+                        disabled={!enabledState[provider]}
                         className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-600 font-mono focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       />
                     </div>

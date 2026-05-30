@@ -100,7 +100,33 @@ export const MonitorPage: React.FC = () => {
 
   const fetchMetrics = useCallback(async () => {
     try {
-      const data = await apiFetch('/metrics');
+      const raw = await apiFetch('/metrics');
+      // Map backend field names to frontend schema + compute derived values
+      const totalRequests = raw.requests_total ?? 0;
+      const cacheHits = raw.cache_hits ?? 0;
+      const cacheMisses = raw.cache_misses ?? 0;
+      const totalCache = cacheHits + cacheMisses;
+
+      // Map backend status strings to frontend union
+      const mapStatus = (s: string): 'healthy' | 'degraded' | 'down' => {
+        if (s === 'healthy') return 'healthy';
+        if (s === 'unhealthy') return 'degraded';
+        return 'down'; // 'unavailable' or anything else
+      };
+
+      const data: SystemMetrics = {
+        total_requests: totalRequests,
+        active_jobs: raw.queue_depth ?? 0,
+        queue_depth: raw.queue_depth ?? 0,
+        cache_hit_rate: totalCache > 0 ? Math.round((cacheHits / totalCache) * 100) : 0,
+        avg_latency_ms: Math.round(raw.avg_duration_ms ?? 0),
+        error_count: raw.error_count ?? 0,
+        db_status: mapStatus(raw.db_status),
+        redis_status: mapStatus(raw.redis_status),
+        uptime_seconds: Math.floor(raw.uptime_seconds ?? 0),
+        requests_per_minute: 0, // not tracked yet
+        recent_errors: [], // not tracked yet
+      };
       setMetrics(data);
       setError(null);
     } catch (err: any) {
@@ -234,12 +260,12 @@ export const MonitorPage: React.FC = () => {
             <p className="text-xs text-slate-500 mt-1">Avg Latency</p>
           </div>
 
-          {/* Error Count */}
+            {/* Error Count */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
             <div className="flex items-center justify-between mb-3">
               <AlertTriangle size={20} className="text-red-400" />
               <span className={`text-xs ${metrics.error_count < 1200 ? 'text-emerald-400' : 'text-red-400'}`}>
-                {((metrics.error_count / metrics.total_requests) * 100).toFixed(2)}% rate
+                {metrics.total_requests > 0 ? ((metrics.error_count / metrics.total_requests) * 100).toFixed(2) + '% rate' : 'N/A'}
               </span>
             </div>
             <p className="text-2xl font-bold text-white">{metrics.error_count.toLocaleString()}</p>
