@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db import get_db
 from src.middleware.auth import admin_required
-from src.models.sql_models import AuditLog, FeatureFlag, Subscription, User, UserFeatureOverride
+from src.models.sql_models import AuditLog, FeatureFlag, Plan, PlanFeatureLink, Subscription, User, UserFeatureOverride
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
@@ -754,3 +754,213 @@ async def set_user_override(
             user_id=str(override.user_id), feature_key=override.feature_key,
             enabled=override.enabled,
         )
+
+
+# ---------------------------------------------------------------------------
+# Plans Management
+# ---------------------------------------------------------------------------
+
+
+class PlanItem(BaseModel):
+    id: str
+    key: str
+    name: str
+    description: str | None = None
+    price_cents: int
+    currency: str
+    billing_period: str
+    extractions_per_month: int
+    is_active: bool
+    sort_order: int
+    features: list[str] = []  # feature flag keys assigned to this plan
+
+
+class CreatePlanRequest(BaseModel):
+    key: str = Field(..., min_length=1, max_length=50)
+    name: str = Field(..., min_length=1, max_length=100)
+    description: str | None = None
+    price_cents: int = 0
+    currency: str = "USD"
+    billing_period: str = "monthly"
+    extractions_per_month: int = 0
+    is_active: bool = True
+    sort_order: int = 0
+
+
+class UpdatePlanRequest(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    price_cents: int | None = None
+    currency: str | None = None
+    billing_period: str | None = None
+    extractions_per_month: int | None = None
+    is_active: bool | None = None
+    sort_order: int | None = None
+
+
+class PlanFeatureAssignment(BaseModel):
+    feature_id: str
+
+
+async def _plan_to_item(plan: Plan, db: AsyncSession) -> PlanItem:
+    """Convert a Plan model to PlanItem with feature keys."""
+    result = await db.execute(
+        select(FeatureFlag.key)
+        .join(PlanFeatureLink, PlanFeatureLink.feature_id == FeatureFlag.id)
+        .where(PlanFeatureLink.plan_id == plan.id)
+    )
+    feature_keys = [row[0] for row in result.all()]
+    return PlanItem(
+        id=str(plan.id), key=plan.key, name=plan.name,
+        description=plan.description, price_cents=plan.price_cents,
+        currency=plan.currency, billing_period=plan.billing_period,
+        extractions_per_month=plan.extractions_per_month,
+        is_active=plan.is_active, sort_order=plan.sort_order,
+        features=feature_keys,
+    )
+
+
+@router.get("/plans", response_model=list[PlanItem])
+async def list_plans(
+    include_inactive: bool = Query(False),
+    admin_user: dict = Depends(admin_required),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all plans with their assigned features."""
+    query = select(Plan).order_by(Plan.sort_order, Plan.key)
+    if not include_inactive:
+        query = query.where(Plan.is_active == True)  # noqa: E712
+    result = await db.execute(query)
+    plans = result.scalars().all()
+    return [await _plan_to_item(p, db) for p in plans]
+
+
+@router.post("/plans", response_model=PlanItem, status_code=status.HTTP_201_CREATED)
+async def create_plan(
+    body: CreatePlanRequest,
+    admin_user: dict = Depends(admin_required),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a new plan."""
+    existing = await db.execute(select(Plan).where(Plan.key == body.key))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Plan key already exists")
+
+    plan = Plan(**body.model_dump())
+    db.add(plan)
+    await db.flush()
+    return await _plan_to_item(plan, db)
+
+
+@router.patch("/plans/{plan_id}", response_model=PlanItem)
+async def update_plan(
+    plan_id: str,
+    body: UpdatePlanRequest,
+    admin_user: dict = Depends(admin_required),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update a plan."""
+    try:
+        pid = uuid.UUID(plan_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid UUID")
+
+    result = await db.execute(select(Plan).where(Plan.id == pid))
+    plan = result.scalar_one_or_none()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(plan, field, value)
+    await db.flush()
+    return await _plan_to_item(plan, db)
+
+
+@router.delete("/plans/{plan_id}", response_model=MessageResponse)
+async def delete_plan(
+    plan_id: str,
+    admin_user: dict = Depends(admin_required),
+    db: AsyncSession = Depends(get_db),
+):
+    """Soft-delete a plan by deactivating it."""
+    try:
+        pid = uuid.UUID(plan_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid UUID")
+
+    result = await db.execute(select(Plan).where(Plan.id == pid))
+    plan = result.scalar_one_or_none()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+
+    plan.is_active = False
+    await db.flush()
+    return MessageResponse(message=f"Plan '{plan.name}' has been deactivated")
+
+
+@router.post("/plans/{plan_id}/features/{feature_id}", response_model=PlanItem)
+async def assign_feature_to_plan(
+    plan_id: str,
+    feature_id: str,
+    admin_user: dict = Depends(admin_required),
+    db: AsyncSession = Depends(get_db),
+):
+    """Assign a feature flag to a plan."""
+    try:
+        pid = uuid.UUID(plan_id)
+        fid = uuid.UUID(feature_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid UUID")
+
+    plan = (await db.execute(select(Plan).where(Plan.id == pid))).scalar_one_or_none()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+
+    feature = (await db.execute(select(FeatureFlag).where(FeatureFlag.id == fid))).scalar_one_or_none()
+    if not feature:
+        raise HTTPException(status_code=404, detail="Feature not found")
+
+    existing = await db.execute(
+        select(PlanFeatureLink).where(
+            PlanFeatureLink.plan_id == pid, PlanFeatureLink.feature_id == fid
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Feature already assigned to plan")
+
+    link = PlanFeatureLink(plan_id=pid, feature_id=fid)
+    db.add(link)
+    await db.flush()
+    return await _plan_to_item(plan, db)
+
+
+@router.delete("/plans/{plan_id}/features/{feature_id}", response_model=PlanItem)
+async def unassign_feature_from_plan(
+    plan_id: str,
+    feature_id: str,
+    admin_user: dict = Depends(admin_required),
+    db: AsyncSession = Depends(get_db),
+):
+    """Remove a feature flag from a plan."""
+    try:
+        pid = uuid.UUID(plan_id)
+        fid = uuid.UUID(feature_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid UUID")
+
+    plan = (await db.execute(select(Plan).where(Plan.id == pid))).scalar_one_or_none()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+
+    result = await db.execute(
+        select(PlanFeatureLink).where(
+            PlanFeatureLink.plan_id == pid, PlanFeatureLink.feature_id == fid
+        )
+    )
+    link = result.scalar_one_or_none()
+    if not link:
+        raise HTTPException(status_code=404, detail="Feature not assigned to this plan")
+
+    await db.delete(link)
+    await db.flush()
+    return await _plan_to_item(plan, db)
