@@ -83,7 +83,7 @@ export default function LandingPage() {
   return (
     <>
       {/* Hero */}
-      <section className="pt-32 pb-20 relative overflow-hidden">
+      <section className="pt-40 pb-28 relative overflow-hidden">
         <div className="section-container text-center">
           <div className="animate-fade-in-up stagger-1 mb-6">
             <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[#00d4a0]/30 bg-[#00d4a0]/10 text-[#00d4a0] text-sm font-medium">
@@ -146,7 +146,7 @@ export default function LandingPage() {
       </section>
 
       {/* Social Proof */}
-      <section className="py-12 border-y border-[#1c1c2a]">
+      <section className="py-16 border-y border-[#1c1c2a]">
         <div className="section-container">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {[
@@ -165,10 +165,10 @@ export default function LandingPage() {
       </section>
 
       {/* Problem */}
-      <section className="py-24">
+      <section className="py-32">
         <div className="section-container">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+          <div className="text-center mb-20">
+            <h2 className="text-3xl md:text-4xl font-bold mb-5">
               Web Scraping Is <span className="text-red-400">Broken</span>
             </h2>
             <p className="text-gray-400 max-w-xl mx-auto">
@@ -176,7 +176,7 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-3 gap-10">
             {[
               {
                 icon: '💔',
@@ -205,10 +205,10 @@ export default function LandingPage() {
       </section>
 
       {/* How It Works */}
-      <section className="py-24 bg-[#0a0a12]/50">
+      <section className="py-32 bg-[#0a0a12]/50">
         <div className="section-container">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+          <div className="text-center mb-20">
+            <h2 className="text-3xl md:text-4xl font-bold mb-5">
               How It <span className="gradient-text">Works</span>
             </h2>
             <p className="text-gray-400 max-w-xl mx-auto">
@@ -216,7 +216,7 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-3 gap-10">
             {[
               {
                 step: '01',
@@ -258,10 +258,10 @@ export default function LandingPage() {
       </section>
 
       {/* Live Demo */}
-      <section className="py-24">
+      <section className="py-32">
         <div className="section-container">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+          <div className="text-center mb-20">
+            <h2 className="text-3xl md:text-4xl font-bold mb-5">
               See It In <span className="gradient-text">Action</span>
             </h2>
             <p className="text-gray-400 max-w-xl mx-auto">
@@ -326,10 +326,10 @@ export default function LandingPage() {
       </section>
 
       {/* Features */}
-      <section id="features" className="py-24 bg-[#0a0a12]/50">
+      <section id="features" className="py-32 bg-[#0a0a12]/50">
         <div className="section-container">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+          <div className="text-center mb-20">
+            <h2 className="text-3xl md:text-4xl font-bold mb-5">
               Everything You <span className="gradient-text">Need</span>
             </h2>
             <p className="text-gray-400 max-w-xl mx-auto">
@@ -338,9 +338,9 @@ export default function LandingPage() {
           </div>
 
           {Object.entries(grouped).map(([category, catFeatures]) => (
-            <div key={category} className="mb-12">
-              <h3 className="text-lg font-semibold text-gray-300 mb-6 capitalize">{category}</h3>
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div key={category} className="mb-16">
+              <h3 className="text-lg font-semibold text-gray-300 mb-8 capitalize">{category}</h3>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {catFeatures.map((feature) => (
                   <div key={feature.key} className="glass-card p-6">
                     <div className="text-2xl mb-3">{featureIcons[feature.name] || '✦'}</div>
@@ -355,10 +355,10 @@ export default function LandingPage() {
       </section>
 
       {/* Use Cases */}
-      <section className="py-24">
+      <section className="py-32">
         <div className="section-container">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+          <div className="text-center mb-20">
+            <h2 className="text-3xl md:text-4xl font-bold mb-5">
               Built For <span className="gradient-text">Every Use Case</span>
             </h2>
             <p className="text-gray-400 max-w-xl mx-auto">
@@ -366,7 +366,7 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-10">
             {[
               { icon: '💰', title: 'Price Monitoring', desc: 'Track competitor pricing across thousands of products. Get alerts when prices change.' },
               { icon: '📰', title: 'Content Aggregation', desc: 'Aggregate news, articles, and content from multiple sources into a single feed.' },
@@ -386,10 +386,10 @@ export default function LandingPage() {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="py-24 bg-[#0a0a12]/50">
+      <section id="pricing" className="py-32 bg-[#0a0a12]/50">
         <div className="section-container">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+          <div className="text-center mb-20">
+            <h2 className="text-3xl md:text-4xl font-bold mb-5">
               Simple, <span className="gradient-text">Transparent</span> Pricing
             </h2>
             <p className="text-gray-400 max-w-xl mx-auto">
@@ -443,9 +443,9 @@ export default function LandingPage() {
       </section>
 
       {/* CTA */}
-      <section className="py-24">
+      <section className="py-32">
         <div className="section-container text-center">
-          <div className="glass-card p-16 max-w-3xl mx-auto relative overflow-hidden">
+          <div className="glass-card p-20 max-w-3xl mx-auto relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-[#00d4a0]/10 to-[#4494ff]/10" />
             <div className="relative">
               <h2 className="text-3xl md:text-4xl font-bold mb-4">

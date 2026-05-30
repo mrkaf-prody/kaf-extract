@@ -9,11 +9,7 @@
   --color-brand-blue: #4494ff;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+/* Tailwind v4 handles its own reset — no manual reset needed */
 
 html {
   scroll-behavior: smooth;
@@ -24,6 +20,7 @@ body {
   background-color: #06060a;
   color: #e2e8f0;
   overflow-x: hidden;
+  line-height: 1.7;
 }
 
 code, pre, .font-mono {
@@ -199,10 +196,10 @@ code, pre, .font-mono {
   background: #0a0a12;
   border: 1px solid #1c1c2a;
   border-radius: 12px;
-  padding: 20px;
+  padding: 28px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.8;
   overflow-x: auto;
   position: relative;
 }
@@ -229,6 +226,7 @@ code, pre, .font-mono {
   border: 1px solid #1c1c2a;
   border-radius: 16px;
   transition: all 0.3s ease;
+  padding: 32px;
 }
 
 .glass-card:hover {
@@ -241,14 +239,16 @@ code, pre, .font-mono {
   background: linear-gradient(135deg, #00d4a0, #00b88c);
   color: #06060a;
   font-weight: 600;
-  padding: 12px 28px;
+  padding: 14px 32px;
   border-radius: 12px;
   border: none;
   cursor: pointer;
   transition: all 0.3s ease;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  text-decoration: none;
+  font-size: 15px;
 }
 
 .btn-primary:hover {
@@ -260,14 +260,16 @@ code, pre, .font-mono {
   background: transparent;
   color: #e2e8f0;
   font-weight: 500;
-  padding: 12px 28px;
+  padding: 14px 32px;
   border-radius: 12px;
-  border: 1px solid #1c1c2a;
+  border: 1px solid #2a2a3e;
   cursor: pointer;
   transition: all 0.3s ease;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  text-decoration: none;
+  font-size: 15px;
 }
 
 .btn-secondary:hover {
@@ -279,7 +281,13 @@ code, pre, .font-mono {
 .section-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 48px;
+}
+
+@media (max-width: 768px) {
+  .section-container {
+    padding: 0 20px;
+  }
 }
 
 /* Intersection observer reveal */
