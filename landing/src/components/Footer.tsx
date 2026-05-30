@@ -2,9 +2,9 @@ import { Link } from 'react-router-dom'
 
 export default function Footer() {
   return (
-    <footer className="border-t border-[#1c1c2a] bg-[#06060a]/80 backdrop-blur-xl">
-      <div className="section-container py-16">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
+    <footer className="border-t border-[#1c1c2a] bg-[#06060a]/80 backdrop-blur-xl mt-8">
+      <div className="section-container py-20">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-16">
           {/* Brand */}
           <div className="md:col-span-1">
             <Link to="/" className="flex items-center gap-3 mb-4">
@@ -53,7 +53,7 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="mt-12 pt-8 border-t border-[#1c1c2a] flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="mt-16 pt-10 border-t border-[#1c1c2a] flex flex-col md:flex-row justify-between items-center gap-6 pb-4">
           <p className="text-sm text-gray-600">
             © {new Date().getFullYear()} Kaf Extract. All rights reserved.
           </p>

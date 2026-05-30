@@ -332,25 +332,102 @@ export default function LandingPage() {
             <h2 className="text-3xl md:text-4xl font-bold mb-5">
               Everything You <span className="gradient-text">Need</span>
             </h2>
-            <p className="text-gray-400 max-w-xl mx-auto">
-              A complete toolkit for web data extraction at any scale.
+            <p className="text-gray-400 max-w-xl mx-auto text-lg">
+              From a single URL to millions — extract, automate, and integrate web data your way.
             </p>
           </div>
 
-          {Object.entries(grouped).map(([category, catFeatures]) => (
-            <div key={category} className="mb-16">
-              <h3 className="text-lg font-semibold text-gray-300 mb-8 capitalize">{category}</h3>
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {catFeatures.map((feature) => (
-                  <div key={feature.key} className="glass-card p-6">
-                    <div className="text-2xl mb-3">{featureIcons[feature.name] || '✦'}</div>
-                    <h4 className="font-semibold text-white mb-2">{feature.name}</h4>
-                    <p className="text-sm text-gray-400 leading-relaxed">{feature.description}</p>
-                  </div>
+          {/* Benefit-oriented feature groups */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-10">
+            {[
+              {
+                icon: '🧠',
+                title: 'AI-Powered Extraction',
+                desc: 'Just describe what you want in plain English. Our AI understands page structure, navigates dynamic content, and returns clean structured data — no selectors needed.',
+                tag: 'Most Popular',
+              },
+              {
+                icon: '🎯',
+                title: 'CSS Selector Precision',
+                desc: 'For developers who want full control. Target exact elements with familiar CSS syntax. Extract text, attributes, HTML, and more with pixel-perfect accuracy.',
+                tag: null,
+              },
+              {
+                icon: '⚡',
+                title: 'Batch Processing',
+                desc: 'Process up to 50 URLs in a single API call. Parallel execution delivers results in seconds, not minutes. Perfect for large-scale data collection.',
+                tag: 'Pro & Enterprise',
+              },
+              {
+                icon: '⏰',
+                title: 'Scheduled Monitoring',
+                desc: 'Set it and forget it. Schedule extractions to run hourly, daily, or weekly. Get notified when data changes. Track competitors automatically.',
+                tag: null,
+              },
+              {
+                icon: '🔗',
+                title: 'Webhook Integrations',
+                desc: 'Get instant notifications when extractions complete. HMAC-SHA256 signed payloads. Integrate with Slack, Teams, Zapier, or your own pipeline.',
+                tag: null,
+              },
+              {
+                icon: '📊',
+                title: 'Usage Dashboard',
+                desc: 'Real-time visibility into your extraction activity. Track usage against your plan limits, view history, and export data — all from one clean dashboard.',
+                tag: null,
+              },
+              {
+                icon: '🐍',
+                title: 'SDKs & API Access',
+                desc: 'Full REST API with 43+ endpoints. Official Python and JavaScript SDKs. Interactive API docs with try-it-out. Get started in under 5 minutes.',
+                tag: null,
+              },
+              {
+                icon: '🔐',
+                title: 'Enterprise Security',
+                desc: 'Two-factor authentication, API key management, role-based team access, and SOC-2 compliant infrastructure. Your data stays yours.',
+                tag: null,
+              },
+              {
+                icon: '🚀',
+                title: '99.9% Uptime SLA',
+                desc: 'Built on enterprise-grade infrastructure with automatic failover. Sub-2-second average response times. We handle the hard parts so you can focus on your data.',
+                tag: null,
+              },
+            ].map((feature, i) => (
+              <div key={i} className="glass-card p-8 group relative overflow-hidden">
+                {feature.tag && (
+                  <span className="absolute top-4 right-4 text-[10px] font-bold uppercase tracking-wider text-[#00d4a0] bg-[#00d4a0]/10 px-2 py-0.5 rounded-full">
+                    {feature.tag}
+                  </span>
+                )}
+                <div className="text-3xl mb-4">{feature.icon}</div>
+                <h3 className="text-lg font-semibold text-white mb-3">{feature.title}</h3>
+                <p className="text-gray-400 leading-relaxed text-sm">{feature.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Dynamic features from API — supplementary */}
+          {Object.keys(grouped).length > 0 && (
+            <div className="mt-20 text-center">
+              <p className="text-sm text-gray-500 mb-6">
+                {features.length} feature flags available • Fully configurable per plan
+              </p>
+              <div className="flex flex-wrap justify-center gap-3 max-w-3xl mx-auto">
+                {features.slice(0, 12).map((f) => (
+                  <span key={f.key} className="text-xs px-3 py-1.5 rounded-full border border-[#1c1c2a] text-gray-500 hover:text-[#00d4a0] hover:border-[#00d4a0]/30 transition-colors cursor-default">
+                    {f.name}
+                  </span>
                 ))}
+                {features.length > 12 && (
+                  <span className="text-xs px-3 py-1.5 rounded-full border border-[#1c1c2a] text-gray-600">
+                    +{features.length - 12} more
+                  </span>
+                )}
               </div>
             </div>
-          ))}
+          )}
         </div>
       </section>
 
