@@ -166,52 +166,6 @@ async def list_users(
     }
 
 
-class UpdateUserRequest(BaseModel):
-    status: str | None = None
-    role: str | None = None
-
-
-@router.patch("/users/{user_id}", response_model=AdminUserItem)
-async def update_user(
-    user_id: str,
-    body: UpdateUserRequest,
-    admin: dict = Depends(admin_required),
-    db: AsyncSession = Depends(get_db),
-):
-    """Update a user's status or role (admin only)."""
-    try:
-        uid = uuid.UUID(user_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid user_id UUID format",
-        )
-
-    result = await db.execute(select(User).where(User.id == uid))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
-
-    if body.status:
-        user.status = body.status
-    if body.role:
-        user.role = body.role
-
-    await db.flush()
-
-    return AdminUserItem(
-        id=str(user.id),
-        email=user.email,
-        name=user.name,
-        role=user.role,
-        status=user.status,
-        created_at=user.created_at.isoformat() if user.created_at else "",
-    )
-
-
 @router.delete("/users/{user_id}", response_model=MessageResponse)
 async def delete_user(
     user_id: str,

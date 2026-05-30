@@ -1,10 +1,12 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Users, Search, AlertTriangle, Shield, UserCheck, UserX, Trash2, Edit3,
   RefreshCw, Plus, X, CheckCircle, XCircle, Eye, EyeOff,
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
 } from 'lucide-react';
 
+// ─── Types ───
 interface AdminUser {
   id: string;
   email: string;
@@ -14,6 +16,11 @@ interface AdminUser {
   created_at: string;
 }
 
+// ─── Constants ───
+const PAGE_SIZES = [25, 50, 100];
+const DEBOUNCE_MS = 400;
+
+// ─── Helpers ───
 const roleIcon = (role: string) => {
   switch (role) {
     case 'admin': return <Shield size={14} className="text-amber-400" />;
@@ -291,29 +298,62 @@ const Toast: React.FC<{ message: string; type: 'success' | 'error'; onClose: () 
 export const UsersPage: React.FC = () => {
   const { apiFetch } = useAuth();
 
+  // Data
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  // Filters
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   // Modals
   const [createOpen, setCreateOpen] = useState(false);
   const [editUser, setEditUser] = useState<AdminUser | null>(null);
   const [deleteUser, setDeleteUser] = useState<AdminUser | null>(null);
 
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1); // Reset to page 1 on search
+    }, DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Reset page on filter change
+  useEffect(() => { setPage(1); }, [roleFilter, statusFilter, pageSize]);
+
+  // Load users
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch('/api/v1/admin/users');
+      const params = new URLSearchParams({
+        limit: String(pageSize),
+        offset: String((page - 1) * pageSize),
+      });
+      if (debouncedSearch) params.set('search', debouncedSearch);
+      if (roleFilter !== 'all') params.set('role', roleFilter);
+      if (statusFilter !== 'all') params.set('status', statusFilter);
+
+      const data = await apiFetch(`/api/v1/admin/users?${params}`);
       setUsers(data.users || []);
+      setTotal(data.total || 0);
     } catch (err: any) {
       setError(err.message || 'Failed to load users');
     } finally {
       setLoading(false);
     }
-  }, [apiFetch]);
+  }, [apiFetch, page, pageSize, debouncedSearch, roleFilter, statusFilter]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -342,14 +382,10 @@ export const UsersPage: React.FC = () => {
     await load();
   };
 
-  const filtered = users.filter((u) => {
-    const q = search.toLowerCase();
-    return (
-      u.email.toLowerCase().includes(q) ||
-      (u.name || '').toLowerCase().includes(q) ||
-      u.role.toLowerCase().includes(q)
-    );
-  });
+  // Pagination derived
+  const totalPages = Math.ceil(total / pageSize);
+  const startItem = total > 0 ? (page - 1) * pageSize + 1 : 0;
+  const endItem = Math.min(page * pageSize, total);
 
   return (
     <div className="space-y-6">
@@ -357,7 +393,9 @@ export const UsersPage: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-white">Users</h2>
-          <p className="text-sm text-slate-400 mt-1">Manage registered users</p>
+          <p className="text-sm text-slate-400 mt-1">
+            {total} registered user{total !== 1 ? 's' : ''}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -375,16 +413,53 @@ export const UsersPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-        <input
-          type="text"
-          placeholder="Search users by email, name, or role..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
-        />
+      {/* Filters Bar */}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[240px] max-w-md">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+          <input
+            type="text"
+            placeholder="Search by email or name..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
+          />
+        </div>
+
+        {/* Role Filter */}
+        <select
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value)}
+          className="px-3 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+        >
+          <option value="all">All Roles</option>
+          <option value="user">User</option>
+          <option value="admin">Admin</option>
+        </select>
+
+        {/* Status Filter */}
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-3 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+        >
+          <option value="all">All Statuses</option>
+          <option value="active">Active</option>
+          <option value="suspended">Suspended</option>
+          <option value="deleted">Deleted</option>
+        </select>
+
+        {/* Page Size */}
+        <select
+          value={pageSize}
+          onChange={(e) => setPageSize(Number(e.target.value))}
+          className="px-3 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+        >
+          {PAGE_SIZES.map((s) => (
+            <option key={s} value={s}>{s} per page</option>
+          ))}
+        </select>
       </div>
 
       {/* Error */}
@@ -410,7 +485,7 @@ export const UsersPage: React.FC = () => {
             </thead>
             <tbody>
               {loading ? (
-                Array.from({ length: 5 }).map((_, i) => (
+                Array.from({ length: Math.min(pageSize, 10) }).map((_, i) => (
                   <tr key={i} className="border-b border-slate-800/50">
                     <td className="px-4 py-3"><div className="h-4 bg-slate-800 rounded w-48 animate-pulse" /></td>
                     <td className="px-4 py-3"><div className="h-4 bg-slate-800 rounded w-16 animate-pulse" /></td>
@@ -419,14 +494,16 @@ export const UsersPage: React.FC = () => {
                     <td className="px-4 py-3"><div className="h-4 bg-slate-800 rounded w-16 animate-pulse ml-auto" /></td>
                   </tr>
                 ))
-              ) : filtered.length === 0 ? (
+              ) : users.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-12 text-center text-slate-500 text-sm">
-                    {search ? 'No users match your search.' : 'No users found.'}
+                    {debouncedSearch || roleFilter !== 'all' || statusFilter !== 'all'
+                      ? 'No users match your filters.'
+                      : 'No users found.'}
                   </td>
                 </tr>
               ) : (
-                filtered.map((user) => (
+                users.map((user) => (
                   <tr key={user.id} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -475,9 +552,50 @@ export const UsersPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Count */}
-      {!loading && (
-        <p className="text-xs text-slate-500">{filtered.length} user{filtered.length !== 1 ? 's' : ''} {search ? 'matching search' : 'total'}</p>
+      {/* Pagination Bar */}
+      {total > 0 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-slate-500">
+            Showing {startItem}–{endItem} of {total} users
+          </p>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage(1)}
+              disabled={page === 1}
+              className="p-1.5 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              title="First page"
+            >
+              <ChevronsLeft size={16} />
+            </button>
+            <button
+              onClick={() => setPage(Math.max(1, page - 1))}
+              disabled={page === 1}
+              className="p-1.5 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              title="Previous page"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="px-3 py-1 text-sm text-slate-400">
+              Page {page} of {totalPages}
+            </span>
+            <button
+              onClick={() => setPage(Math.min(totalPages, page + 1))}
+              disabled={page >= totalPages}
+              className="p-1.5 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              title="Next page"
+            >
+              <ChevronRight size={16} />
+            </button>
+            <button
+              onClick={() => setPage(totalPages)}
+              disabled={page >= totalPages}
+              className="p-1.5 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              title="Last page"
+            >
+              <ChevronsRight size={16} />
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Modals */}
