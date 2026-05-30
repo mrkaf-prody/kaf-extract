@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 
 interface Step {
@@ -44,7 +44,7 @@ open https://extract.kafcenter.com/dashboard/register
 export KAF_API_KEY="kaf_a1b2c3d4e5f6..."
 
 # Verify it works:
-curl -H "Authorization: Bearer $KAF_API_KEY" \\
+curl -H "Authorization: Bearer *** \\
      https://extract.kafcenter.com/v1/keys`,
     codeLabel: 'API Key Setup',
     tip: 'Create separate keys for development and production. You can revoke keys at any time.',
@@ -54,7 +54,7 @@ curl -H "Authorization: Bearer $KAF_API_KEY" \\
     subtitle: 'Extract data with CSS selectors',
     description: 'The simplest way to extract data is with CSS selectors. Define what data you want by targeting HTML elements on the page.',
     code: `curl -X POST https://extract.kafcenter.com/v1/extract \\
-  -H "Authorization: Bearer $KAF_API_KEY" \\
+  -H "Authorization: Bearer *** \\
   -H "Content-Type: application/json" \\
   -d '{
     "url": "https://news.ycombinator.com",
@@ -82,7 +82,7 @@ curl -H "Authorization: Bearer $KAF_API_KEY" \\
     description: 'Kaf Extract offers two methods: CSS selectors for precise targeting, and AI extraction for natural language descriptions. Use AI when you don\'t know the page structure.',
     code: `# CSS Extraction — precise, fast, deterministic
 curl -X POST https://extract.kafcenter.com/v1/extract \\
-  -H "Authorization: Bearer $KAF_API_KEY" \\
+  -H "Authorization: Bearer *** \\
   -d '{
     "url": "https://example.com/products",
     "selectors": {
@@ -93,7 +93,7 @@ curl -X POST https://extract.kafcenter.com/v1/extract \\
 
 # AI Extraction — flexible, adaptive, natural language
 curl -X POST https://extract.kafcenter.com/v1/extract/ai \\
-  -H "Authorization: Bearer $KAF_API_KEY" \\
+  -H "Authorization: Bearer *** \\
   -d '{
     "url": "https://example.com/products",
     "prompt": "Extract product names and prices as JSON",
@@ -111,10 +111,10 @@ curl -X POST https://extract.kafcenter.com/v1/extract/ai \\
 
 # CSV export — add format parameter
 curl -X POST https://extract.kafcenter.com/v1/extract \\
-  -H "Authorization: Bearer $KAF_API_KEY" \\
+  -H "Authorization: Bearer *** \\
   -d '{
     "url": "https://example.com",
-    "selectors": {"name": ".name", "price": ".price"},
+    "selectors": {".name": ".name", ".price": ".price"},
     "format": "csv"
   }'
 
@@ -130,7 +130,7 @@ curl -X POST https://extract.kafcenter.com/v1/extract \\
     description: 'Once you\'re comfortable with basic extractions, explore scheduling for recurring data collection, batch processing for multiple URLs, and proxy rotation for difficult sites.',
     code: `# Schedule — run extraction daily at 9 AM
 curl -X POST https://extract.kafcenter.com/v1/schedules \\
-  -H "Authorization: Bearer $KAF_API_KEY" \\
+  -H "Authorization: Bearer *** \\
   -d '{
     "name": "Daily Price Check",
     "url": "https://example.com/pricing",
@@ -141,7 +141,7 @@ curl -X POST https://extract.kafcenter.com/v1/schedules \\
 
 # Batch — extract from multiple URLs
 curl -X POST https://extract.kafcenter.com/v1/extract/batch \\
-  -H "Authorization: Bearer $KAF_API_KEY" \\
+  -H "Authorization: Bearer *** \\
   -d '{
     "urls": ["https://site1.com", "https://site2.com"],
     "prompt": "Extract main heading"
@@ -154,7 +154,24 @@ curl -X POST https://extract.kafcenter.com/v1/extract/batch \\
 export default function TutorialPage() {
   const [currentStep, setCurrentStep] = useState(0)
   const [typingComplete, setTypingComplete] = useState(false)
+  const [isVisible, setIsVisible] = useState(true)
 
+  // Smooth step transition: fade out, change step, fade in
+  const goToStep = useCallback((nextStep: number) => {
+    if (nextStep < 0 || nextStep >= steps.length || nextStep === currentStep) return
+
+    // Start fade out
+    setIsVisible(false)
+
+    // After fade out completes, switch step and fade in
+    setTimeout(() => {
+      setCurrentStep(nextStep)
+      setTypingComplete(false)
+      setIsVisible(true)
+    }, 200)
+  }, [currentStep])
+
+  // Typing animation timer
   useEffect(() => {
     setTypingComplete(false)
     const timer = setTimeout(() => setTypingComplete(true), 2500)
@@ -201,7 +218,8 @@ export default function TutorialPage() {
           {steps.map((step, i) => (
             <button
               key={i}
-              onClick={() => setCurrentStep(i)}
+              type="button"
+              onClick={() => goToStep(i)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all ${
                 i === currentStep
                   ? 'bg-[#00d4a0]/20 text-[#00d4a0] border border-[#00d4a0]/30'
@@ -224,8 +242,16 @@ export default function TutorialPage() {
           ))}
         </div>
 
-        {/* Step content */}
-        <div className="step-content" key={currentStep}>
+        {/* Step content — NO key prop to prevent full re-mount */}
+        <div
+          className="step-content"
+          style={{
+            minHeight: '400px',
+            opacity: isVisible ? 1 : 0,
+            transform: isVisible ? 'translateY(0)' : 'translateY(12px)',
+            transition: 'opacity 0.25s ease-out, transform 0.25s ease-out',
+          }}
+        >
           <div className="glass-card p-8 mb-6">
             <div className="mb-6">
               <span className="text-sm text-[#00d4a0] font-mono mb-1 block">{steps[currentStep].subtitle}</span>
@@ -266,7 +292,8 @@ export default function TutorialPage() {
         {/* Navigation */}
         <div className="flex justify-between items-center">
           <button
-            onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
+            type="button"
+            onClick={() => goToStep(currentStep - 1)}
             disabled={currentStep === 0}
             className={`btn-secondary ${currentStep === 0 ? 'opacity-40 cursor-not-allowed' : ''}`}
           >
@@ -276,7 +303,8 @@ export default function TutorialPage() {
 
           {currentStep < steps.length - 1 ? (
             <button
-              onClick={() => setCurrentStep(currentStep + 1)}
+              type="button"
+              onClick={() => goToStep(currentStep + 1)}
               className="btn-primary"
             >
               Next Step

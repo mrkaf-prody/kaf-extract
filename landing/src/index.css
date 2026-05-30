@@ -316,7 +316,7 @@ code, pre, .font-mono {
   transition: width 0.5s ease;
 }
 
-/* Step transition */
+/* Step transition — smooth opacity/transform driven by React state */
 .step-content {
-  animation: fadeInUp 0.5s ease-out;
+  will-change: opacity, transform;
 }

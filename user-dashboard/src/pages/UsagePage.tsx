@@ -47,7 +47,7 @@ export const UsagePage: React.FC = () => {
   const barColor =
     percent >= 90 ? 'bg-red-500' :
     percent >= 80 ? 'bg-yellow-500' :
-    'bg-blue-500';
+    'bg-[#00d4a0]';
 
   const daysRemaining = usage
     ? Math.max(0, Math.ceil(
@@ -58,7 +58,7 @@ export const UsagePage: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <span className="text-slate-400">Loading usage data...</span>
+        <span className="text-[#9a9aae]">Loading usage data...</span>
       </div>
     );
   }
@@ -66,44 +66,44 @@ export const UsagePage: React.FC = () => {
   return (
     <div>
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-white mb-1">Usage</h2>
-        <p className="text-slate-400 text-sm">Monitor your monthly extraction usage and limits.</p>
+        <h2 className="text-2xl font-bold text-[#f0f0f5] mb-1">Usage</h2>
+        <p className="text-[#9a9aae] text-sm">Monitor your monthly extraction usage and limits.</p>
       </div>
 
       {/* Usage bar */}
-      <div className="bg-slate-900 border border-slate-800 rounded-lg p-6 mb-6">
+      <div className="bg-[#0a0a12] border border-[#1c1c2a] rounded-xl p-6 mb-6">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-            <BarChart3 size={20} className="text-blue-400" />
+          <h3 className="text-lg font-semibold text-[#f0f0f5] flex items-center gap-2">
+            <BarChart3 size={20} className="text-[#00d4a0]" />
             Current Month Usage
           </h3>
-          <span className="text-sm text-slate-400">
-            Resets in <span className="text-white font-medium">{daysRemaining}</span> days
+          <span className="text-sm text-[#9a9aae]">
+            Resets in <span className="text-[#f0f0f5] font-medium">{daysRemaining}</span> days
           </span>
         </div>
 
         <div className="flex items-end gap-2 mb-2">
-          <span className="text-3xl font-bold text-white">
+          <span className="text-3xl font-bold text-[#f0f0f5]">
             {usage ? usage.current_usage.toLocaleString() : '0'}
           </span>
-          <span className="text-slate-500 text-lg mb-0.5">
+          <span className="text-[#5c5c70] text-lg mb-0.5">
             / {usage ? usage.monthly_limit.toLocaleString() : '0'}
           </span>
-          <span className="text-sm text-slate-500 mb-0.5 ml-1">extractions</span>
+          <span className="text-sm text-[#5c5c70] mb-0.5 ml-1">extractions</span>
         </div>
 
         {usage?.hard_cap && (
-          <p className="text-xs text-slate-500 mb-3">Hard cap: {usage.hard_cap.toLocaleString()}</p>
+          <p className="text-xs text-[#5c5c70] mb-3">Hard cap: {usage.hard_cap.toLocaleString()}</p>
         )}
 
         {/* Progress bar */}
-        <div className="w-full bg-slate-800 rounded-full h-3 mb-2 overflow-hidden">
+        <div className="w-full bg-[#14141f] rounded-full h-3 mb-2 overflow-hidden">
           <div
             className={`${barColor} h-full rounded-full transition-all duration-500`}
             style={{ width: `${Math.min(percent, 100)}%` }}
           />
         </div>
-        <div className="flex justify-between text-xs text-slate-500">
+        <div className="flex justify-between text-xs text-[#5c5c70]">
           <span>{percent}% used</span>
           <span>{100 - percent}% remaining</span>
         </div>
@@ -115,7 +115,7 @@ export const UsagePage: React.FC = () => {
               <span
                 key={threshold}
                 className={`text-xs px-2 py-1 rounded ${
-                  sent ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/30' : 'bg-slate-800 text-slate-500'
+                  sent ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/30' : 'bg-[#14141f] text-[#5c5c70]'
                 }`}
               >
                 {threshold}% alert {sent ? 'sent' : 'pending'}
@@ -126,12 +126,12 @@ export const UsagePage: React.FC = () => {
       </div>
 
       {/* Reset date card */}
-      <div className="bg-slate-900 border border-slate-800 rounded-lg p-5 mb-6">
+      <div className="bg-[#0a0a12] border border-[#1c1c2a] rounded-xl p-5 mb-6">
         <div className="flex items-center gap-3">
           <Clock size={20} className="text-purple-400" />
           <div>
-            <div className="text-white font-medium">Monthly Reset</div>
-            <div className="text-sm text-slate-400">
+            <div className="text-[#f0f0f5] font-medium">Monthly Reset</div>
+            <div className="text-sm text-[#9a9aae]">
               {usage ? new Date(usage.reset_date).toLocaleDateString('en-US', {
                 year: 'numeric', month: 'long', day: 'numeric',
               }) : 'Unknown'}
@@ -141,19 +141,19 @@ export const UsagePage: React.FC = () => {
       </div>
 
       {/* Recent extractions */}
-      <div className="bg-slate-900 border border-slate-800 rounded-lg p-5">
-        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+      <div className="bg-[#0a0a12] border border-[#1c1c2a] rounded-xl p-5">
+        <h3 className="text-lg font-semibold text-[#f0f0f5] mb-4 flex items-center gap-2">
           <Zap size={18} className="text-yellow-400" />
           Recent Extractions
         </h3>
         {recent.length === 0 ? (
-          <p className="text-slate-500 text-sm">No recent extractions found.</p>
+          <p className="text-[#5c5c70] text-sm">No recent extractions found.</p>
         ) : (
           <div className="space-y-2">
             {recent.map((item, i) => (
               <div
                 key={item.id || i}
-                className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded text-sm"
+                className="flex items-center justify-between py-2 px-3 bg-[#14141f]/50 rounded text-sm"
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <span
@@ -162,7 +162,7 @@ export const UsagePage: React.FC = () => {
                       item.status === 'queued' ? 'bg-yellow-400' : 'bg-red-400'
                     }`}
                   />
-                  <span className="text-slate-300 truncate">{item.url}</span>
+                  <span className="text-[#b8b8c8] truncate">{item.url}</span>
                 </div>
                 <div className="flex items-center gap-3 ml-4 flex-shrink-0">
                   <span
@@ -173,7 +173,7 @@ export const UsagePage: React.FC = () => {
                   >
                     {item.status}
                   </span>
-                  <span className="text-slate-500 text-xs">
+                  <span className="text-[#5c5c70] text-xs">
                     {item.created_at ? new Date(item.created_at).toLocaleString() : ''}
                   </span>
                 </div>
