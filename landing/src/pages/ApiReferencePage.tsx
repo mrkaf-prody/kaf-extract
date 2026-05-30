@@ -166,7 +166,7 @@ export default function ApiReferencePage() {
               <div className="code-block text-sm">
                 <pre><code>
                   <span className="text-gray-500"># Sign up and get your API key from the dashboard</span>{'\n'}
-                  <span className="text-[#00d4a0]">curl</span> <span className="text-[#4494ff]">https://api.kafcenter.com/dashboard/register</span>
+                  <span className="text-[#00d4a0]">curl</span> <span className="text-[#4494ff]">https://extract.kafcenter.com/dashboard/register</span>
                 </code></pre>
               </div>
             </div>
@@ -174,7 +174,7 @@ export default function ApiReferencePage() {
               <h3 className="font-semibold text-white mb-3">2. Make your first extraction</h3>
               <div className="code-block text-sm">
                 <pre><code>
-                  <span className="text-[#00d4a0]">curl</span> <span className="text-white">-X POST </span><span className="text-[#4494ff]">https://api.kafcenter.com/v1/extract/ai</span> \{'\n'}
+                  <span className="text-[#00d4a0]">curl</span> <span className="text-white">-X POST </span><span className="text-[#4494ff]">https://extract.kafcenter.com/v1/extract/ai</span> \{'\n'}
                   <span className="text-white">  -H </span><span className="text-yellow-300">"Authorization: Bearer YOUR_API_KEY"</span> \{'\n'}
                   <span className="text-white">  -H </span><span className="text-yellow-300">"Content-Type: application/json"</span> \{'\n'}
                   <span className="text-white">  -d </span><span className="text-yellow-300">{'\'{"url":"https://example.com","prompt":"Extract page title"}\''}</span>

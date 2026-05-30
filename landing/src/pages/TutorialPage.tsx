@@ -45,7 +45,7 @@ export KAF_API_KEY="kaf_a1b2c3d4e5f6..."
 
 # Verify it works:
 curl -H "Authorization: Bearer $KAF_API_KEY" \\
-     https://api.kafcenter.com/v1/keys`,
+     https://extract.kafcenter.com/v1/keys`,
     codeLabel: 'API Key Setup',
     tip: 'Create separate keys for development and production. You can revoke keys at any time.',
   },
@@ -53,7 +53,7 @@ curl -H "Authorization: Bearer $KAF_API_KEY" \\
     title: 'First Extraction',
     subtitle: 'Extract data with CSS selectors',
     description: 'The simplest way to extract data is with CSS selectors. Define what data you want by targeting HTML elements on the page.',
-    code: `curl -X POST https://api.kafcenter.com/v1/extract \\
+    code: `curl -X POST https://extract.kafcenter.com/v1/extract \\
   -H "Authorization: Bearer $KAF_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -81,7 +81,7 @@ curl -H "Authorization: Bearer $KAF_API_KEY" \\
     subtitle: 'Choose the right extraction method',
     description: 'Kaf Extract offers two methods: CSS selectors for precise targeting, and AI extraction for natural language descriptions. Use AI when you don\'t know the page structure.',
     code: `# CSS Extraction — precise, fast, deterministic
-curl -X POST https://api.kafcenter.com/v1/extract \\
+curl -X POST https://extract.kafcenter.com/v1/extract \\
   -H "Authorization: Bearer $KAF_API_KEY" \\
   -d '{
     "url": "https://example.com/products",
@@ -92,7 +92,7 @@ curl -X POST https://api.kafcenter.com/v1/extract \\
   }'
 
 # AI Extraction — flexible, adaptive, natural language
-curl -X POST https://api.kafcenter.com/v1/extract/ai \\
+curl -X POST https://extract.kafcenter.com/v1/extract/ai \\
   -H "Authorization: Bearer $KAF_API_KEY" \\
   -d '{
     "url": "https://example.com/products",
@@ -110,7 +110,7 @@ curl -X POST https://api.kafcenter.com/v1/extract/ai \\
 # Response: {"data": [...], "status": "success"}
 
 # CSV export — add format parameter
-curl -X POST https://api.kafcenter.com/v1/extract \\
+curl -X POST https://extract.kafcenter.com/v1/extract \\
   -H "Authorization: Bearer $KAF_API_KEY" \\
   -d '{
     "url": "https://example.com",
@@ -129,7 +129,7 @@ curl -X POST https://api.kafcenter.com/v1/extract \\
     subtitle: 'Schedules, batches, and more',
     description: 'Once you\'re comfortable with basic extractions, explore scheduling for recurring data collection, batch processing for multiple URLs, and proxy rotation for difficult sites.',
     code: `# Schedule — run extraction daily at 9 AM
-curl -X POST https://api.kafcenter.com/v1/schedules \\
+curl -X POST https://extract.kafcenter.com/v1/schedules \\
   -H "Authorization: Bearer $KAF_API_KEY" \\
   -d '{
     "name": "Daily Price Check",
@@ -140,7 +140,7 @@ curl -X POST https://api.kafcenter.com/v1/schedules \\
   }'
 
 # Batch — extract from multiple URLs
-curl -X POST https://api.kafcenter.com/v1/extract/batch \\
+curl -X POST https://extract.kafcenter.com/v1/extract/batch \\
   -H "Authorization: Bearer $KAF_API_KEY" \\
   -d '{
     "urls": ["https://site1.com", "https://site2.com"],

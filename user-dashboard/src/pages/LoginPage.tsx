@@ -12,7 +12,7 @@ export const LoginPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState<'password' | 'totp'>('password');
 
-  const API_BASE = 'https://extract.kafcenter.com';
+  const API_BASE = '';  // Same domain — relative paths
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

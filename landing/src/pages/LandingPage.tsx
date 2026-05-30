@@ -128,7 +128,7 @@ export default function LandingPage() {
                   <span className="text-gray-500">$ </span>
                   <span className="text-[#00d4a0]">curl</span>
                   <span className="text-white"> -X POST </span>
-                  <span className="text-[#4494ff]">https://api.kafcenter.com/v1/extract/ai</span>
+                  <span className="text-[#4494ff]">https://extract.kafcenter.com/v1/extract/ai</span>
                   <span className="text-white"> \</span>{'\n'}
                   <span className="text-white">  -H </span>
                   <span className="text-yellow-300">"Authorization: Bearer YOUR_API_KEY"</span>

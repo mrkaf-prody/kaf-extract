@@ -26,7 +26,7 @@ export const RegisterPage = () => {
   const [verifying, setVerifying] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const API_BASE = 'https://extract.kafcenter.com';
+  const API_BASE = '';  // Same domain — relative paths
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
