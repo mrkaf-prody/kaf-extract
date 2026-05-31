@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { CreditCard, Check, Zap, Clock, ArrowUpCircle, Ticket, ChevronRight, FileText } from 'lucide-react';
+import { CreditCard, Check, Zap, Clock, ArrowUpCircle, Ticket } from 'lucide-react';
 
 interface Plan {
   key: string;
@@ -181,12 +181,6 @@ export const BillingPage: React.FC = () => {
     if (key.includes('enterprise')) return planBadgeColors.enterprise;
     if (key.includes('pro')) return planBadgeColors.pro;
     return planBadgeColors.hobby;
-  };
-
-  // Get plan extraction limit from features
-  const getPlanExtractionLimit = (plan: Plan): string => {
-    const feat = plan.features.find(f => f.toLowerCase().includes('extraction'));
-    return feat || `${plan.features.length} features`;
   };
 
   return (

@@ -4,7 +4,7 @@ import {
   Link2, Bot, FileJson, Download, Copy, Check, History,
   X, Sparkles, AlertTriangle, ChevronRight, ChevronLeft,
   Globe, Clock, Info, Trash2, Play, Lock, Layers, HelpCircle,
-  ChevronDown, List
+  ChevronDown
 } from 'lucide-react';
 
 type Mode = 'ai' | 'schema';
