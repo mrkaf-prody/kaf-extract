@@ -14,3 +14,7 @@ tests/
 README.md
 user-dashboard/dist/
 user-dashboard/node_modules/
+landing/dist/
+landing/node_modules/
+admin/dist/
+admin/node_modules/
