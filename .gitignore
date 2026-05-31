@@ -6,8 +6,9 @@ data/
 .venv/
 venv/
 dist/
-!user-dashboard/dist/
-!landing/dist/
+user-dashboard/dist/
+landing/dist/
+admin/dist/
 *.egg-info/
 .vscode/
 .idea/
