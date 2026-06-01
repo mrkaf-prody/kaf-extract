@@ -464,11 +464,15 @@ async def admin_analytics(
         since = datetime.now(UTC) - timedelta(days=days)
 
         # Signups per day
+        # NOTE: Use .label() and reuse — PostgreSQL rejects separate date_trunc
+        # expressions in SELECT + GROUP BY + ORDER BY (different param bindings
+        # → not recognized as same expression → "column must appear in GROUP BY").
+        day_trunc = func.date_trunc("day", User.created_at).label("day")
         result = await db.execute(
-            select(func.date_trunc("day", User.created_at), func.count(User.id))
+            select(day_trunc, func.count(User.id))
             .where(User.created_at >= since)
-            .group_by(func.date_trunc("day", User.created_at))
-            .order_by(func.date_trunc("day", User.created_at))
+            .group_by(day_trunc)
+            .order_by(day_trunc)
         )
         signups_per_day = [
             {"date": d.isoformat() if hasattr(d, "isoformat") else str(d), "count": c}
